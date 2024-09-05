@@ -1,5 +1,9 @@
 package shortener
 
+import (
+	"fmt"
+)
+
 const Domain = "s.nykevin.com/"
 const UrlSuffixLength = 7
 
@@ -10,6 +14,6 @@ func ShortenURL(link string) (string, error) {
 	case "youtube.com":
 		return Domain + "1234abc", nil
 	default:
-		return Domain + "default", nil
+		return "", fmt.Errorf("can't shorten invalid url %v", link)
 	}
 }

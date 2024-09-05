@@ -9,7 +9,7 @@ import (
 
 const startCounter = 500 // use large initial num to prevent guesses
 // use counter with base62
-// tdd
+// tdd top down -> black box -> do not test internal implementation
 func TestShortenURL(t *testing.T) {
 	t.Run("shorten new urls", func(t *testing.T) {
 		shortLink, err := shortener.ShortenURL("google.com")
@@ -56,18 +56,23 @@ func assertSuffixLength(t testing.TB, shortLink string) {
 }
 
 func assertEqualURL(t testing.TB, got, want string) {
+	t.Helper()
+
 	if got != want {
 		t.Errorf("got different short links for the same url %v, %v", got, want)
 	}
 }
 
 func assertNotEqualURL(t testing.TB, got, want string) {
+	t.Helper()
+
 	if got == want {
 		t.Errorf("expected different short links for different url 	%v, %v", got, want)
 	}
 }
 
 func assertNoError(t testing.TB, err error) {
+	t.Helper()
 	if err != nil {
 		t.Errorf("should not have gotten an error but got error %q", err)
 	}
