@@ -1,6 +1,7 @@
 package shortener_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -8,7 +9,7 @@ import (
 )
 
 const startCounter = 500 // use large initial num to prevent guesses
-// use counter with base62
+// use counter with base62 -> reverse to obfusciate generator logic
 // tdd top down -> black box -> do not test internal implementation
 func TestShortenURL(t *testing.T) {
 	t.Run("shorten new urls", func(t *testing.T) {
@@ -41,8 +42,15 @@ func TestShortenURL(t *testing.T) {
 		if err == nil {
 			t.Error("expected an error when shortening invalid URL")
 		}
-
 	})
+
+	t.Run("correct suffix length", func(t *testing.T) {
+		for i := 0; i < 1000; i++ {
+			shortLink, _ := shortener.ShortenURL(fmt.Sprintf("example%d.com", i))
+			assertSuffixLength(t, shortLink)
+		}
+	})
+
 }
 
 func assertSuffixLength(t testing.TB, shortLink string) {
@@ -50,7 +58,7 @@ func assertSuffixLength(t testing.TB, shortLink string) {
 
 	shortSuffix := strings.TrimPrefix(shortLink, shortener.Domain)
 	if len(shortSuffix) != shortener.UrlSuffixLength {
-		t.Errorf("got %d short suffix length, expected %d", len(shortSuffix), shortener.UrlSuffixLength)
+		t.Fatalf("got %d short suffix length, expected %d", len(shortSuffix), shortener.UrlSuffixLength)
 	}
 
 }
