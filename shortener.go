@@ -29,10 +29,10 @@ type URLShortener struct {
 	Config     *Config
 }
 
-func NewURLShortener() *URLShortener {
+func NewURLShortener(startCounter uint64) *URLShortener {
 	return &URLShortener{
 		urlMap:     make(map[string]string),
-		urlCounter: 500,
+		urlCounter: startCounter,
 		Config: &Config{
 			domain:          "s.nykevin.com/",
 			urlSuffixLength: 7,
@@ -55,6 +55,15 @@ func (u *URLShortener) ShortenURL(link string) (string, error) {
 	}
 
 	return u.urlMap[link], nil
+}
+
+func (u *URLShortener) ExpandURL(link string) (string, error) {
+	for originalURL, shortURL := range u.urlMap {
+		if shortURL == link {
+			return originalURL, nil
+		}
+	}
+	return "", fmt.Errorf("%v does not exist in store", link)
 }
 
 func (u *URLShortener) validateURL(link string) error {
