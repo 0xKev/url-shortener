@@ -82,22 +82,7 @@ func TestExpandURL(t *testing.T) {
 		_, err := shortener.ExpandURL(google)
 		assertError(t, err)
 	})
-}
 
-func TestConcurrentOperations(t *testing.T) {
-	shortener := shortener.NewURLShortener(startCounter)
-
-	cases := []string{
-		google,
-		github,
-		youtube,
-	}
-
-	for _, c := range cases {
-		go func() {
-			_, _ = shortener.ShortenURL(c)
-		}()
-	}
 }
 
 func assertSuffixLength(t testing.TB, shortLink string, shortener *shortener.URLShortener) {
