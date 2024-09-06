@@ -1,12 +1,18 @@
 package base62
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
-const base62Digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+const (
+	base62Digits  = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	encodedLength = 7
+)
 
 func Encode(num uint64) string {
 	if num == 0 {
-		return "0"
+		return strings.Repeat("0", encodedLength)
 	}
 	var base62 []string
 
@@ -15,6 +21,12 @@ func Encode(num uint64) string {
 		base62 = append(base62, string(base62Digits[remainder]))
 		num /= 62
 	}
+
+	for len(base62) != encodedLength {
+		base62 = append(base62, "0")
+	}
+
+	slices.Reverse(base62)
 
 	return strings.Join(base62, "")
 }
