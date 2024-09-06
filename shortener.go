@@ -2,37 +2,75 @@ package shortener
 
 import (
 	"fmt"
-	"strconv"
+	"strings"
+
+	"github.com/0xKev/url-shortener/internal/base62"
 )
 
-const Domain = "s.nykevin.com/"
-const UrlSuffixLength = 7
-const urlCounterLimit = 3521614606207 // base62 encoding -> zzzzzzz max length of 7
+// max counter limit  3521614606207 base62 encoding -> zzzzzzz max length of 7
 
-var (
-	urlMap     = make(map[string]string)
-	urlCounter = 500
-)
+type Config struct {
+	domain          string
+	urlSuffixLength int
+	urlCounterLimit int
+}
 
-func ShortenURL(link string) (string, error) {
-	if link == "" {
-		return "", fmt.Errorf("can't shorten invalid url %v", link)
+func (c *Config) URLSuffixLength() int {
+	return c.urlSuffixLength
+}
+
+func (c *Config) Domain() string {
+	return c.domain
+}
+
+type URLShortener struct {
+	urlMap     map[string]string
+	urlCounter uint64
+	Config     *Config
+}
+
+func NewURLShortener() *URLShortener {
+	return &URLShortener{
+		urlMap:     make(map[string]string),
+		urlCounter: 500,
+		Config: &Config{
+			domain:          "s.nykevin.com/",
+			urlSuffixLength: 7,
+			urlCounterLimit: 3521614606207,
+		},
+	}
+}
+
+func (u *URLShortener) ShortenURL(link string) (string, error) {
+	if err := u.validateURL(link); err != nil {
+		return "", err
 	}
 
-	shortLink, exists := urlMap[link]
+	shortLink, exists := u.urlMap[link]
 
 	if exists {
 		return shortLink, nil
 	} else {
-		urlMap[link] = fmt.Sprint(Domain + generateShortSuffix())
+		u.urlMap[link] = fmt.Sprint(u.Config.domain + u.generateShortSuffix())
 	}
 
-	return urlMap[link], nil
+	return u.urlMap[link], nil
 }
 
-func generateShortSuffix() string {
+func (u *URLShortener) validateURL(link string) error {
+	if link == "" {
+		return fmt.Errorf("can't shorten empty url %v", link)
+	}
 
-	generatedSuffix := "abcd" + strconv.FormatInt(int64(urlCounter), 10)
-	urlCounter++
+	if !strings.Contains(link, ".") {
+		return fmt.Errorf("can't shorten url without a domain %v", link)
+	}
+
+	return nil
+}
+
+func (u *URLShortener) generateShortSuffix() string {
+	generatedSuffix := base62.Encode(u.urlCounter)
+	u.urlCounter++
 	return generatedSuffix
 }
