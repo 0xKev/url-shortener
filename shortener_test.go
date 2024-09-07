@@ -1,6 +1,7 @@
 package shortener_test
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -44,15 +45,19 @@ func TestShortenURL(t *testing.T) {
 	})
 
 	t.Run("handle invalid urls", func(t *testing.T) {
-		cases := []string{
-			"",
-			"google",
+		cases := []struct {
+			baseURL     string
+			expectedErr shortener.InvalidURLError
+		}{
+			{"", shortener.InvalidURLError{shortener.ErrEmptyURL, ""}},
+			{"google", shortener.InvalidURLError{shortener.ErrNoDomainURL, "google"}},
 		}
 
 		for _, c := range cases {
-			_, err := urlShortener.ShortenURL(c)
-			if err == nil {
-				t.Error("expected an error when shortening invalid URL")
+			_, err := urlShortener.ShortenURL(c.baseURL)
+			assertError(t, err)
+			if !errors.Is(err, c.expectedErr) {
+				t.Fatalf("expected error %v, but got %v", c.expectedErr.Error(), err)
 			}
 		}
 	})
@@ -66,9 +71,10 @@ func TestShortenURL(t *testing.T) {
 
 	t.Run("expect error when URLCounter is over the max limit", func(t *testing.T) {
 		config := shortener.NewDefaultConfig()
-		config.SetURLCounter(3521614606205)
+		config.SetURLCounter(config.URLCounterLimit() - 2) // num of valid cases
 		urlShortener := shortener.NewURLShortener(config)
 		counterLimit := urlShortener.Config.URLCounterLimit()
+		wantError := shortener.ExceedCounterError{counterLimit, counterLimit}
 
 		cases := []struct {
 			baseURL       string
@@ -76,15 +82,17 @@ func TestShortenURL(t *testing.T) {
 		}{
 			{google, nil},
 			{github, nil},
-			{youtube, shortener.ExceedCounterError{counterLimit, counterLimit}},
-			{reddit, shortener.ExceedCounterError{counterLimit, counterLimit}},
+			{youtube, wantError},
+			{reddit, wantError},
 		}
 
 		for _, c := range cases {
 			_, err := urlShortener.ShortenURL(c.baseURL)
 			t.Logf("Current counter: %d", config.URLCounter())
-			if c.expectedError != nil && err != nil {
-				if c.expectedError != err {
+			if c.expectedError != nil {
+				assertError(t, err)
+
+				if !errors.As(err, &wantError) {
 					t.Fatalf("expected error %v but did not get one", c.expectedError)
 				}
 			}
@@ -108,7 +116,11 @@ func TestExpandURL(t *testing.T) {
 
 	t.Run("expect error when expanding non existent URLs", func(t *testing.T) {
 		_, err := urlShortener.ExpandURL(google)
+		expectedError := shortener.ShortURLNotFoundError{ShortURL: google}
 		assertError(t, err)
+		if !errors.As(err, &expectedError) {
+			t.Fatalf("expected error %v but got none", expectedError.Error())
+		}
 	})
 
 }

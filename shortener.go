@@ -15,6 +15,11 @@ const (
 	defaultURLSuffixLength = 7
 	defaultURLCounterLimit = 3521614606207
 	defaultURLCounter      = 500
+
+	ErrCounterLimitReached  = "counter limit exceeded: "
+	ErrEmptyURL             = "can't shorten empty url"
+	ErrNoDomainURL          = "can't shorten url without a domain"
+	ErrShortURLDoesNotExist = ""
 )
 
 type ExceedCounterError struct {
@@ -23,7 +28,15 @@ type ExceedCounterError struct {
 }
 
 func (e ExceedCounterError) Error() string {
-	return fmt.Sprintf("counter limit exceed: current count %d, max count %d", e.CurrentCounter, e.MaxCounter)
+	return fmt.Sprintf(ErrCounterLimitReached+"current count %d, max count %d", e.CurrentCounter, e.MaxCounter)
+}
+
+type ShortURLNotFoundError struct {
+	ShortURL string
+}
+
+func (s ShortURLNotFoundError) Error() string {
+	return fmt.Sprintf("%v does not exist in store", s.ShortURL)
 }
 
 type InvalidURLError struct {
@@ -32,7 +45,7 @@ type InvalidURLError struct {
 }
 
 func (i InvalidURLError) Error() string {
-	return fmt.Sprintf(i.ErrorMsg, "%v", i.SubmittedURL)
+	return fmt.Sprintf("invalid url %s, %v", i.ErrorMsg, i.SubmittedURL)
 }
 
 type Config struct {
@@ -136,16 +149,16 @@ func (u *URLShortener) ExpandURL(link string) (string, error) {
 			return originalURL, nil
 		}
 	}
-	return "", fmt.Errorf("%v does not exist in store", link)
+	return "", ShortURLNotFoundError{ShortURL: link}
 }
 
 func (u *URLShortener) validateURL(link string) error {
 	if link == "" {
-		return InvalidURLError{"can't shorten empty url", link}
+		return InvalidURLError{ErrEmptyURL, link}
 	}
 
 	if !strings.Contains(link, ".") {
-		return InvalidURLError{"can't shorten url without a domain", link}
+		return InvalidURLError{ErrNoDomainURL, link}
 	}
 
 	return nil
