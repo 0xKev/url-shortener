@@ -3,6 +3,7 @@ package shortener_test
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	shortener "github.com/0xKev/url-shortener"
@@ -85,6 +86,51 @@ func TestExpandURL(t *testing.T) {
 
 }
 
+func TestConcurrentOperations(t *testing.T) {
+	shortener := shortener.NewURLShortener(startCounter)
+
+	cases := []string{
+		youtube,
+		google,
+		github,
+	}
+
+	results := make(map[string]string)
+
+	var wg sync.WaitGroup
+
+	for _, url := range cases {
+		wg.Add(1)
+		go func(url string) {
+			defer wg.Done()
+			shortLink, err := shortener.ShortenURL(url)
+			assertNoError(t, err)
+			results[url] = shortLink
+			assertSuffixLength(t, shortLink, shortener)
+
+			shortLink2, err := shortener.ShortenURL("example.com")
+			assertNoError(t, err)
+			assertSuffixLength(t, shortLink, shortener)
+			assertNotEqualURL(t, shortLink, shortLink2)
+		}(url)
+	}
+
+	wg.Wait()
+
+	assertEqual(t, len(cases), len(results))
+	shortLink, err := shortener.ShortenURL(cases[0])
+	expandedLink, _ := shortener.ExpandURL(shortLink)
+	assertEqualURL(t, expandedLink, cases[0])
+	assertNoError(t, err)
+
+	for originalURL, shortURL := range results {
+		shortLink, _ := shortener.ShortenURL(originalURL)
+		assertEqualURL(t, shortLink, shortURL)
+		expandedLink, _ := shortener.ExpandURL(shortLink)
+		assertEqualURL(t, originalURL, expandedLink)
+	}
+}
+
 func assertSuffixLength(t testing.TB, shortLink string, shortener *shortener.URLShortener) {
 	t.Helper()
 
@@ -92,7 +138,13 @@ func assertSuffixLength(t testing.TB, shortLink string, shortener *shortener.URL
 	if len(shortSuffix) != shortener.Config.URLSuffixLength() {
 		t.Fatalf("got %d short suffix length, expected %d", len(shortSuffix), shortener.Config.URLSuffixLength())
 	}
+}
 
+func assertEqual[T comparable](t testing.TB, got, want T) {
+	t.Helper()
+	if got != want {
+		t.Errorf("expected %v but got %v", want, got)
+	}
 }
 
 func assertError(t testing.TB, err error) {
@@ -106,7 +158,7 @@ func assertEqualURL(t testing.TB, got, want string) {
 	t.Helper()
 
 	if got != want {
-		t.Errorf("got different short links for the same url %v, %v", got, want)
+		t.Errorf("got different short links for the same url : %v, %v", got, want)
 	}
 }
 

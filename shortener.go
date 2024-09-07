@@ -3,6 +3,7 @@ package shortener
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/0xKev/url-shortener/internal/base62"
 )
@@ -13,6 +14,8 @@ type Config struct {
 	domain          string
 	urlSuffixLength int
 	urlCounterLimit int
+	urlCounter      uint64
+	mu              sync.Mutex
 }
 
 func (c *Config) URLSuffixLength() int {
@@ -24,24 +27,25 @@ func (c *Config) Domain() string {
 }
 
 type URLShortener struct {
-	urlMap     map[string]string
-	urlCounter uint64
-	Config     *Config
+	urlMap map[string]string
+	Config *Config
 }
 
 func NewURLShortener(startCounter uint64) *URLShortener {
 	return &URLShortener{
-		urlMap:     make(map[string]string),
-		urlCounter: startCounter,
+		urlMap: make(map[string]string),
 		Config: &Config{
 			domain:          "s.nykevin.com/",
 			urlSuffixLength: 7,
 			urlCounterLimit: 3521614606207,
+			urlCounter:      500,
 		},
 	}
 }
 
 func (u *URLShortener) ShortenURL(link string) (string, error) {
+	u.Config.mu.Lock()
+	defer u.Config.mu.Unlock()
 	if err := u.validateURL(link); err != nil {
 		return "", err
 	}
@@ -79,7 +83,7 @@ func (u *URLShortener) validateURL(link string) error {
 }
 
 func (u *URLShortener) generateShortSuffix() string {
-	generatedSuffix := base62.Encode(u.urlCounter)
-	u.urlCounter++
+	generatedSuffix := base62.Encode(u.Config.urlCounter)
+	u.Config.urlCounter++
 	return generatedSuffix
 }
