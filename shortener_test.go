@@ -14,30 +14,31 @@ const (
 	google       = "google.com"
 	youtube      = "youtube.com"
 	github       = "github.com"
+	reddit       = "reddit.com"
 ) // use large initial num to prevent guesses
 // use counter with base62 -> reverse to obfusciate generator logic
 // tdd top down -> black box -> do not test internal implementation
 
 func TestShortenURL(t *testing.T) {
-	shortener := shortener.NewURLShortener(startCounter)
+	urlShortener := setUpShortener()
 	t.Run("shorten new urls", func(t *testing.T) {
-		shortLink, err := shortener.ShortenURL(google)
+		shortLink, err := urlShortener.ShortenURL(google)
 		assertNoError(t, err)
-		assertSuffixLength(t, shortLink, shortener)
+		assertSuffixLength(t, shortLink, urlShortener)
 
-		shortLink2, err := shortener.ShortenURL(youtube)
+		shortLink2, err := urlShortener.ShortenURL(youtube)
 		assertNoError(t, err)
 		assertNotEqualURL(t, shortLink, shortLink2)
 
-		shortLink3, err := shortener.ShortenURL(github)
+		shortLink3, err := urlShortener.ShortenURL(github)
 		assertNoError(t, err)
 		assertNotEqualURL(t, shortLink, shortLink3)
 		assertNotEqualURL(t, shortLink2, shortLink3)
 	})
 
 	t.Run("shorten existing urls", func(t *testing.T) {
-		shortLink, _ := shortener.ShortenURL(google)
-		shortLink2, _ := shortener.ShortenURL(google)
+		shortLink, _ := urlShortener.ShortenURL(google)
+		shortLink2, _ := urlShortener.ShortenURL(google)
 
 		assertEqualURL(t, shortLink, shortLink2)
 	})
@@ -49,7 +50,7 @@ func TestShortenURL(t *testing.T) {
 		}
 
 		for _, c := range cases {
-			_, err := shortener.ShortenURL(c)
+			_, err := urlShortener.ShortenURL(c)
 			if err == nil {
 				t.Error("expected an error when shortening invalid URL")
 			}
@@ -58,36 +59,62 @@ func TestShortenURL(t *testing.T) {
 
 	t.Run("correct suffix length", func(t *testing.T) {
 		for i := 0; i < 1000; i++ {
-			shortLink, _ := shortener.ShortenURL(fmt.Sprintf("example%d.com", i))
-			assertSuffixLength(t, shortLink, shortener)
+			shortLink, _ := urlShortener.ShortenURL(fmt.Sprintf("example%d.com", i))
+			assertSuffixLength(t, shortLink, urlShortener)
 		}
 	})
 
+	t.Run("expect error when URLCounter is over the max limit", func(t *testing.T) {
+		config := shortener.NewDefaultConfig()
+		config.SetURLCounter(3521614606205)
+		urlShortener := shortener.NewURLShortener(config)
+		counterLimit := urlShortener.Config.URLCounterLimit()
+
+		cases := []struct {
+			baseURL       string
+			expectedError error
+		}{
+			{google, nil},
+			{github, nil},
+			{youtube, shortener.ExceedCounterError{counterLimit, counterLimit}},
+			{reddit, shortener.ExceedCounterError{counterLimit, counterLimit}},
+		}
+
+		for _, c := range cases {
+			_, err := urlShortener.ShortenURL(c.baseURL)
+			t.Logf("Current counter: %d", config.URLCounter())
+			if c.expectedError != nil && err != nil {
+				if c.expectedError != err {
+					t.Fatalf("expected error %v but did not get one", c.expectedError)
+				}
+			}
+		}
+	})
 }
 
 func TestExpandURL(t *testing.T) {
-	shortener := shortener.NewURLShortener(startCounter)
+	urlShortener := setUpShortener()
 	t.Run("shortened url should return original url", func(t *testing.T) {
-		shortLink, err := shortener.ShortenURL(google)
+		shortLink, err := urlShortener.ShortenURL(google)
 		assertNoError(t, err)
-		originalLink, _ := shortener.ExpandURL(shortLink)
+		originalLink, _ := urlShortener.ExpandURL(shortLink)
 		assertEqualURL(t, google, originalLink)
 
-		shortLink2, err := shortener.ShortenURL(originalLink)
+		shortLink2, err := urlShortener.ShortenURL(originalLink)
 		assertNoError(t, err)
 
 		assertEqualURL(t, shortLink, shortLink2)
 	})
 
 	t.Run("expect error when expanding non existent URLs", func(t *testing.T) {
-		_, err := shortener.ExpandURL(google)
+		_, err := urlShortener.ExpandURL(google)
 		assertError(t, err)
 	})
 
 }
 
 func TestConcurrentOperations(t *testing.T) {
-	shortener := shortener.NewURLShortener(startCounter)
+	urlShortener := setUpShortener()
 
 	cases := []string{
 		youtube,
@@ -103,14 +130,14 @@ func TestConcurrentOperations(t *testing.T) {
 		wg.Add(1)
 		go func(url string) {
 			defer wg.Done()
-			shortLink, err := shortener.ShortenURL(url)
+			shortLink, err := urlShortener.ShortenURL(url)
 			assertNoError(t, err)
 			results[url] = shortLink
-			assertSuffixLength(t, shortLink, shortener)
+			assertSuffixLength(t, shortLink, urlShortener)
 
-			shortLink2, err := shortener.ShortenURL("example.com")
+			shortLink2, err := urlShortener.ShortenURL("example.com")
 			assertNoError(t, err)
-			assertSuffixLength(t, shortLink, shortener)
+			assertSuffixLength(t, shortLink, urlShortener)
 			assertNotEqualURL(t, shortLink, shortLink2)
 		}(url)
 	}
@@ -118,24 +145,30 @@ func TestConcurrentOperations(t *testing.T) {
 	wg.Wait()
 
 	assertEqual(t, len(cases), len(results))
-	shortLink, err := shortener.ShortenURL(cases[0])
-	expandedLink, _ := shortener.ExpandURL(shortLink)
+	shortLink, err := urlShortener.ShortenURL(cases[0])
+	expandedLink, _ := urlShortener.ExpandURL(shortLink)
 	assertEqualURL(t, expandedLink, cases[0])
 	assertNoError(t, err)
 
 	for originalURL, shortURL := range results {
-		shortLink, _ := shortener.ShortenURL(originalURL)
+		shortLink, _ := urlShortener.ShortenURL(originalURL)
 		assertEqualURL(t, shortLink, shortURL)
-		expandedLink, _ := shortener.ExpandURL(shortLink)
+		expandedLink, _ := urlShortener.ExpandURL(shortLink)
 		assertEqualURL(t, originalURL, expandedLink)
 	}
+}
+
+func setUpShortener() *shortener.URLShortener {
+	defaultConfig := shortener.NewDefaultConfig()
+	urlShortener := shortener.NewURLShortener(defaultConfig) // nil loads in default config
+	return urlShortener
 }
 
 func assertSuffixLength(t testing.TB, shortLink string, shortener *shortener.URLShortener) {
 	t.Helper()
 
 	shortSuffix := strings.TrimPrefix(shortLink, shortener.Config.Domain())
-	if len(shortSuffix) != shortener.Config.URLSuffixLength() {
+	if len(shortSuffix) != int(shortener.Config.URLSuffixLength()) {
 		t.Fatalf("got %d short suffix length, expected %d", len(shortSuffix), shortener.Config.URLSuffixLength())
 	}
 }

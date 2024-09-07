@@ -10,15 +10,48 @@ import (
 
 // max counter limit  3521614606207 base62 encoding -> zzzzzzz max length of 7
 
-type Config struct {
-	domain          string
-	urlSuffixLength int
-	urlCounterLimit int
-	urlCounter      uint64
-	mu              sync.Mutex
+const (
+	defaultDomain          = "example.com/"
+	defaultURLSuffixLength = 7
+	defaultURLCounterLimit = 3521614606207
+	defaultURLCounter      = 500
+)
+
+type ExceedCounterError struct {
+	CurrentCounter uint64
+	MaxCounter     uint64
 }
 
-func (c *Config) URLSuffixLength() int {
+func (e ExceedCounterError) Error() string {
+	return fmt.Sprintf("counter limit exceed: current count %d, max count %d", e.CurrentCounter, e.MaxCounter)
+}
+
+type InvalidURLError struct {
+	ErrorMsg     string
+	SubmittedURL string
+}
+
+func (i InvalidURLError) Error() string {
+	return fmt.Sprintf(i.ErrorMsg, "%v", i.SubmittedURL)
+}
+
+type Config struct {
+	domain          string
+	urlSuffixLength uint64
+	urlCounterLimit uint64
+	urlCounter      uint64
+}
+
+func NewDefaultConfig() *Config {
+	return &Config{
+		domain:          defaultDomain,
+		urlSuffixLength: defaultURLSuffixLength,
+		urlCounterLimit: defaultURLCounterLimit,
+		urlCounter:      defaultURLCounter,
+	}
+}
+
+func (c *Config) URLSuffixLength() uint64 {
 	return c.urlSuffixLength
 }
 
@@ -26,26 +59,48 @@ func (c *Config) Domain() string {
 	return c.domain
 }
 
+func (c *Config) URLCounterLimit() uint64 {
+	return c.urlCounterLimit
+}
+
+func (c *Config) URLCounter() uint64 {
+	return c.urlCounter
+}
+
+func (c *Config) SetDomain(domain string) {
+	c.domain = domain
+}
+
+func (c *Config) SetURLCounter(counter uint64) {
+	c.urlCounter = counter
+}
+
 type URLShortener struct {
 	urlMap map[string]string
 	Config *Config
+	mu     sync.Mutex
 }
 
-func NewURLShortener(startCounter uint64) *URLShortener {
+func NewURLShortener(config *Config) *URLShortener {
+	if config == nil {
+		config = NewDefaultConfig()
+	}
 	return &URLShortener{
 		urlMap: make(map[string]string),
-		Config: &Config{
-			domain:          "s.nykevin.com/",
-			urlSuffixLength: 7,
-			urlCounterLimit: 3521614606207,
-			urlCounter:      500,
-		},
+		Config: config,
 	}
 }
 
 func (u *URLShortener) ShortenURL(link string) (string, error) {
-	u.Config.mu.Lock()
-	defer u.Config.mu.Unlock()
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	over, err := u.isOverCounterLimit()
+
+	if over {
+		return "", err
+	}
+
 	if err := u.validateURL(link); err != nil {
 		return "", err
 	}
@@ -59,6 +114,16 @@ func (u *URLShortener) ShortenURL(link string) (string, error) {
 	}
 
 	return u.urlMap[link], nil
+}
+
+func (u *URLShortener) isOverCounterLimit() (bool, error) {
+	if u.Config.urlCounter >= u.Config.urlCounterLimit {
+		return true, ExceedCounterError{
+			CurrentCounter: u.Config.urlCounter,
+			MaxCounter:     u.Config.urlCounterLimit,
+		}
+	}
+	return false, nil
 }
 
 func (u *URLShortener) generateShortURL() string {
@@ -76,18 +141,18 @@ func (u *URLShortener) ExpandURL(link string) (string, error) {
 
 func (u *URLShortener) validateURL(link string) error {
 	if link == "" {
-		return fmt.Errorf("can't shorten empty url %v", link)
+		return InvalidURLError{"can't shorten empty url", link}
 	}
 
 	if !strings.Contains(link, ".") {
-		return fmt.Errorf("can't shorten url without a domain %v", link)
+		return InvalidURLError{"can't shorten url without a domain", link}
 	}
 
 	return nil
 }
 
 func (u *URLShortener) generateShortSuffix() string {
-	generatedSuffix := base62.Encode(u.Config.urlCounter)
 	u.Config.urlCounter++
+	generatedSuffix := base62.Encode(u.Config.urlCounter)
 	return generatedSuffix
 }
