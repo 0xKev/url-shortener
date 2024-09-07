@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	shortener "github.com/0xKev/url-shortener"
+	shortener "github.com/0xKev/url-shortener/internal/shortener"
 )
 
 const (
