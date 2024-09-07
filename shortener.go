@@ -55,10 +55,14 @@ func (u *URLShortener) ShortenURL(link string) (string, error) {
 	if exists {
 		return shortLink, nil
 	} else {
-		u.urlMap[link] = fmt.Sprint(u.Config.domain + u.generateShortSuffix())
+		u.urlMap[link] = u.generateShortURL()
 	}
 
 	return u.urlMap[link], nil
+}
+
+func (u *URLShortener) generateShortURL() string {
+	return fmt.Sprint(u.Config.domain + u.generateShortSuffix())
 }
 
 func (u *URLShortener) ExpandURL(link string) (string, error) {
