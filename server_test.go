@@ -9,11 +9,16 @@ import (
 )
 
 type StubURLStore struct {
-	urlMap map[string]string
+	urlMap        map[string]string
+	shortURLCalls []string
 }
 
 func (s *StubURLStore) GetExpandedURL(shortLink string) string {
 	return s.urlMap[shortLink]
+}
+
+func (s *StubURLStore) RecordBaseURL(baseURL string) {
+	s.shortURLCalls = append(s.shortURLCalls, baseURL)
 }
 
 func TestGETExpandShortURL(t *testing.T) {
@@ -60,8 +65,37 @@ func TestGETExpandShortURL(t *testing.T) {
 	})
 }
 
+func TestCreateShortURL(t *testing.T) {
+	store := StubURLStore{
+		map[string]string{},
+		nil,
+	}
+	shortenerServer := server.NewURLShortenerServer(&store)
+
+	t.Run("records baseURL on POST", func(t *testing.T) {
+		baseUrl := "google.com"
+		response := httptest.NewRecorder()
+		request := newPostShortURLRequest(baseUrl)
+		shortenerServer.ServeHTTP(response, request)
+		assertStatus(t, response.Code, http.StatusAccepted)
+
+		if len(store.shortURLCalls) != 1 {
+			t.Errorf("got %d calls to RecordBaseURL want %d", len(store.shortURLCalls), 1)
+		}
+
+		if store.shortURLCalls[0] != baseUrl {
+			t.Errorf("did not store correct url got %q, want %q", store.shortURLCalls[0], baseUrl)
+		}
+	})
+}
+
 func newGetExpandedURLRequest(shortSuffix string) *http.Request {
-	request, _ := http.NewRequest("GET", ("/expand/" + shortSuffix), nil)
+	request, _ := http.NewRequest("GET", "/expand/"+shortSuffix, nil)
+	return request
+}
+
+func newPostShortURLRequest(baseURL string) *http.Request {
+	request, _ := http.NewRequest("POST", "/shorten/"+baseURL, nil)
 	return request
 }
 

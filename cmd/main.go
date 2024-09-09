@@ -5,15 +5,10 @@ import (
 	"net/http"
 
 	server "github.com/0xKev/url-shortener"
+	store "github.com/0xKev/url-shortener/internal/store"
 )
 
-type InMemoryURLStore struct{}
-
-func (i *InMemoryURLStore) GetExpandedURL(shortLink string) string {
-	return "google.com"
-}
-
 func main() {
-	shortenerServer := server.NewURLShortenerServer(&InMemoryURLStore{})
+	shortenerServer := server.NewURLShortenerServer(store.NewInMemoryURLStore())
 	log.Fatal(http.ListenAndServe(":5000", shortenerServer))
 }
