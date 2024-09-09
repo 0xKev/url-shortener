@@ -20,9 +20,20 @@ const (
 // use counter with base62 -> reverse to obfusciate generator logic
 // tdd top down -> black box -> do not test internal implementation
 
+type MockEncoder struct {
+	encodeCalls []uint64
+	encodeFunc  func(uint64) string
+}
+
+func (m *MockEncoder) Encode(num uint64) string {
+	m.encodeCalls = append(m.encodeCalls, num)
+	return m.encodeFunc(num)
+}
+
 func TestShortenURL(t *testing.T) {
-	urlShortener := setUpShortener()
 	t.Run("shorten new urls", func(t *testing.T) {
+		urlShortener := setUpShortener()
+
 		shortLink, err := urlShortener.ShortenURL(google)
 		assertNoError(t, err)
 		assertSuffixLength(t, shortLink, urlShortener)
@@ -38,6 +49,8 @@ func TestShortenURL(t *testing.T) {
 	})
 
 	t.Run("shorten existing urls", func(t *testing.T) {
+		urlShortener := setUpShortener()
+
 		shortLink, _ := urlShortener.ShortenURL(google)
 		shortLink2, _ := urlShortener.ShortenURL(google)
 
@@ -45,6 +58,8 @@ func TestShortenURL(t *testing.T) {
 	})
 
 	t.Run("handle invalid urls", func(t *testing.T) {
+		urlShortener := setUpShortener()
+
 		cases := []struct {
 			baseURL     string
 			expectedErr shortener.InvalidURLError
@@ -63,6 +78,8 @@ func TestShortenURL(t *testing.T) {
 	})
 
 	t.Run("correct suffix length", func(t *testing.T) {
+		urlShortener := setUpShortener()
+
 		for i := 0; i < 1000; i++ {
 			shortLink, _ := urlShortener.ShortenURL(fmt.Sprintf("example%d.com", i))
 			assertSuffixLength(t, shortLink, urlShortener)
@@ -72,7 +89,12 @@ func TestShortenURL(t *testing.T) {
 	t.Run("expect error when URLCounter is over the max limit", func(t *testing.T) {
 		config := shortener.NewDefaultConfig()
 		config.SetURLCounter(config.URLCounterLimit() - 2) // num of valid cases
-		urlShortener := shortener.NewURLShortener(config)
+		encoder := MockEncoder{
+			encodeFunc: func(num uint64) string {
+				return fmt.Sprintf("%07d", num)
+			},
+		}
+		urlShortener := shortener.NewURLShortener(config, &encoder)
 		counterLimit := urlShortener.Config.URLCounterLimit()
 		wantError := shortener.ExceedCounterError{counterLimit, counterLimit}
 
@@ -172,7 +194,12 @@ func TestConcurrentOperations(t *testing.T) {
 
 func setUpShortener() *shortener.URLShortener {
 	defaultConfig := shortener.NewDefaultConfig()
-	urlShortener := shortener.NewURLShortener(defaultConfig) // nil loads in default config
+	encoder := MockEncoder{
+		encodeFunc: func(num uint64) string {
+			return fmt.Sprintf("%07d", num)
+		},
+	}
+	urlShortener := shortener.NewURLShortener(defaultConfig, &encoder) // nil loads in default config
 	return urlShortener
 }
 

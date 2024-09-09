@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-
-	"github.com/0xKev/url-shortener/internal/base62"
 )
 
 // max counter limit  3521614606207 base62 encoding -> zzzzzzz max length of 7
@@ -89,18 +87,20 @@ func (c *Config) SetURLCounter(counter uint64) {
 }
 
 type URLShortener struct {
-	urlMap map[string]string
-	Config *Config
-	mu     sync.Mutex
+	urlMap  map[string]string
+	Config  *Config
+	mu      sync.Mutex
+	encoder Encoder
 }
 
-func NewURLShortener(config *Config) *URLShortener {
+func NewURLShortener(config *Config, encoder Encoder) *URLShortener {
 	if config == nil {
 		config = NewDefaultConfig()
 	}
 	return &URLShortener{
-		urlMap: make(map[string]string),
-		Config: config,
+		urlMap:  make(map[string]string),
+		Config:  config,
+		encoder: encoder,
 	}
 }
 
@@ -164,8 +164,12 @@ func (u *URLShortener) validateURL(link string) error {
 	return nil
 }
 
+type Encoder interface {
+	Encode(num uint64) string
+}
+
 func (u *URLShortener) generateShortSuffix() string {
 	u.Config.urlCounter++
-	generatedSuffix := base62.Encode(u.Config.urlCounter)
+	generatedSuffix := u.encoder.Encode(u.Config.urlCounter)
 	return generatedSuffix
 }
