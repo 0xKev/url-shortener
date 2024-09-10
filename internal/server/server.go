@@ -11,13 +11,20 @@ const (
 	ShortenRoute = "/shorten/"
 )
 
-type URLShortenerServer struct {
-	store URLStore
+type URLShortener interface {
+	GetExpandedURL(shortLink string) string
+	ShortenBaseURL(baseURL string) string
 }
 
-func NewURLShortenerServer(store URLStore) *URLShortenerServer {
+type URLShortenerServer struct {
+	store     URLStore
+	shortener URLShortener
+}
+
+func NewURLShortenerServer(store URLStore, shortener URLShortener) *URLShortenerServer {
 	return &URLShortenerServer{
-		store: store,
+		store:     store,
+		shortener: shortener,
 	}
 }
 
@@ -32,19 +39,22 @@ func (u *URLShortenerServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (u *URLShortenerServer) showExpandedURL(w http.ResponseWriter, r *http.Request) {
 	shortLink := strings.TrimPrefix(r.URL.Path, ExpandRoute)
-	if shortLink == "" {
+	expandedURL, found := u.store.Load(shortLink)
+	if !found {
 		w.WriteHeader(http.StatusNotFound)
 	}
-	fmt.Fprint(w, u.store.GetExpandedURL(shortLink))
+	fmt.Fprint(w, expandedURL)
 }
 
 func (u *URLShortenerServer) processShortURL(w http.ResponseWriter, r *http.Request) {
 	baseURL := strings.TrimPrefix(r.URL.Path, ShortenRoute)
-	u.store.RecordBaseURL(baseURL)
+	shortURL := u.shortener.ShortenBaseURL(baseURL)
 	w.WriteHeader(http.StatusAccepted)
+	u.store.Save(baseURL, shortURL)
+
 }
 
 type URLStore interface {
-	GetExpandedURL(shortLink string) string
-	RecordBaseURL(baseURL string)
+	Save(baseURL, shortLink string)
+	Load(shortLink string) (string, bool)
 }
