@@ -4,7 +4,7 @@ import (
 	"log"
 	"net/http"
 
-	server "github.com/0xKev/url-shortener"
+	server "github.com/0xKev/url-shortener/internal/server"
 	store "github.com/0xKev/url-shortener/internal/store"
 )
 

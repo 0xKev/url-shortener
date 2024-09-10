@@ -5,7 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	server "github.com/0xKev/url-shortener"
+	server "github.com/0xKev/url-shortener/internal/server"
+	testutil "github.com/0xKev/url-shortener/internal/testutil"
 )
 
 type StubURLStore struct {
@@ -34,34 +35,35 @@ func TestGETExpandShortURL(t *testing.T) {
 	shortenerServer := server.NewURLShortenerServer(&store)
 
 	t.Run("returns google.com", func(t *testing.T) {
-		request := newGetExpandedURLRequest(googleShortPrefix)
+		request := testutil.NewGetExpandedURLRequest(googleShortPrefix)
 		response := httptest.NewRecorder()
 
 		shortenerServer.ServeHTTP(response, request)
-		assertResponseBody(t, response.Body.String(), store.urlMap[googleShortPrefix])
+		t.Log(response.Body.String())
+		testutil.AssertResponseBody(t, response.Body.String(), store.urlMap[googleShortPrefix])
 
-		assertStatus(t, response.Code, http.StatusOK)
+		testutil.AssertStatus(t, response.Code, http.StatusOK)
 	})
 
 	t.Run("returns github.com", func(t *testing.T) {
-		request := newGetExpandedURLRequest(githubShortPrefix)
+		request := testutil.NewGetExpandedURLRequest(githubShortPrefix)
 		response := httptest.NewRecorder()
 
 		shortenerServer.ServeHTTP(response, request)
-		assertResponseBody(t, response.Body.String(), store.urlMap[githubShortPrefix])
+		testutil.AssertResponseBody(t, response.Body.String(), store.urlMap[githubShortPrefix])
 
-		assertStatus(t, response.Code, http.StatusOK)
+		testutil.AssertStatus(t, response.Code, http.StatusOK)
 	})
 
 	t.Run("returns 404 on missing short links", func(t *testing.T) {
-		request := newGetExpandedURLRequest("0000009")
+		request := testutil.NewGetExpandedURLRequest("0000009")
 		response := httptest.NewRecorder()
 
 		shortenerServer.ServeHTTP(response, request)
 		got := response.Code
 		want := http.StatusNotFound
 
-		assertStatus(t, got, want)
+		testutil.AssertStatus(t, got, want)
 	})
 }
 
@@ -75,9 +77,9 @@ func TestCreateShortURL(t *testing.T) {
 	t.Run("records baseURL on POST", func(t *testing.T) {
 		baseUrl := "google.com"
 		response := httptest.NewRecorder()
-		request := newPostShortURLRequest(baseUrl)
+		request := testutil.NewPostShortURLRequest(baseUrl)
 		shortenerServer.ServeHTTP(response, request)
-		assertStatus(t, response.Code, http.StatusAccepted)
+		testutil.AssertStatus(t, response.Code, http.StatusAccepted)
 
 		if len(store.shortURLCalls) != 1 {
 			t.Errorf("got %d calls to RecordBaseURL want %d", len(store.shortURLCalls), 1)
@@ -87,30 +89,4 @@ func TestCreateShortURL(t *testing.T) {
 			t.Errorf("did not store correct url got %q, want %q", store.shortURLCalls[0], baseUrl)
 		}
 	})
-}
-
-func newGetExpandedURLRequest(shortSuffix string) *http.Request {
-	request, _ := http.NewRequest("GET", "/expand/"+shortSuffix, nil)
-	return request
-}
-
-func newPostShortURLRequest(baseURL string) *http.Request {
-	request, _ := http.NewRequest("POST", "/shorten/"+baseURL, nil)
-	return request
-}
-
-func assertResponseBody(t testing.TB, got, want string) {
-	t.Helper()
-
-	if got != want {
-		t.Errorf("response body is wrong, got %q want %q", got, want)
-	}
-}
-
-func assertStatus(t testing.TB, got, want int) {
-	t.Helper()
-
-	if got != want {
-		t.Errorf("did not get correct status, got %d, want %d", got, want)
-	}
 }
