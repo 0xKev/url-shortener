@@ -87,7 +87,6 @@ func (c *Config) SetURLCounter(counter uint64) {
 }
 
 type URLShortener struct {
-	urlMap  map[string]string
 	Config  *Config
 	mu      sync.Mutex
 	encoder Encoder
@@ -98,13 +97,12 @@ func NewURLShortener(config *Config, encoder Encoder) *URLShortener {
 		config = NewDefaultConfig()
 	}
 	return &URLShortener{
-		urlMap:  make(map[string]string),
 		Config:  config,
 		encoder: encoder,
 	}
 }
 
-func (u *URLShortener) ShortenURL(link string) (string, error) {
+func (u *URLShortener) ShortenURL(baseURL string) (string, error) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
@@ -114,19 +112,11 @@ func (u *URLShortener) ShortenURL(link string) (string, error) {
 		return "", err
 	}
 
-	if err := u.validateURL(link); err != nil {
+	if err := u.validateURL(baseURL); err != nil {
 		return "", err
 	}
 
-	shortLink, exists := u.urlMap[link]
-
-	if exists {
-		return shortLink, nil
-	} else {
-		u.urlMap[link] = u.generateShortURL()
-	}
-
-	return u.urlMap[link], nil
+	return u.generateShortURL(), nil
 }
 
 func (u *URLShortener) isOverCounterLimit() (bool, error) {
@@ -141,15 +131,6 @@ func (u *URLShortener) isOverCounterLimit() (bool, error) {
 
 func (u *URLShortener) generateShortURL() string {
 	return fmt.Sprint(u.Config.domain + u.generateShortSuffix())
-}
-
-func (u *URLShortener) ExpandURL(link string) (string, error) {
-	for originalURL, shortURL := range u.urlMap {
-		if shortURL == link {
-			return originalURL, nil
-		}
-	}
-	return "", ShortURLNotFoundError{ShortURL: link}
 }
 
 func (u *URLShortener) validateURL(link string) error {

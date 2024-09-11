@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 	"testing"
 
 	shortener "github.com/0xKev/url-shortener/internal/shortener"
@@ -37,24 +36,26 @@ func TestShortenURL(t *testing.T) {
 		shortLink, err := urlShortener.ShortenURL(google)
 		assertNoError(t, err)
 		assertSuffixLength(t, shortLink, urlShortener)
+		assertValidShortURL(t, shortLink, urlShortener)
 
 		shortLink2, err := urlShortener.ShortenURL(youtube)
 		assertNoError(t, err)
-		assertNotEqualURL(t, shortLink, shortLink2)
+		assertSuffixLength(t, shortLink2, urlShortener)
+		assertValidShortURL(t, shortLink2, urlShortener)
 
 		shortLink3, err := urlShortener.ShortenURL(github)
 		assertNoError(t, err)
-		assertNotEqualURL(t, shortLink, shortLink3)
-		assertNotEqualURL(t, shortLink2, shortLink3)
+		assertSuffixLength(t, shortLink3, urlShortener)
+		assertValidShortURL(t, shortLink3, urlShortener)
 	})
 
-	t.Run("shorten existing urls", func(t *testing.T) {
+	t.Run("shorten same base url results in new short links", func(t *testing.T) {
 		urlShortener := setUpShortener()
 
 		shortLink, _ := urlShortener.ShortenURL(google)
 		shortLink2, _ := urlShortener.ShortenURL(google)
 
-		assertEqualURL(t, shortLink, shortLink2)
+		assertNotEqualURL(t, shortLink, shortLink2)
 	})
 
 	t.Run("handle invalid urls", func(t *testing.T) {
@@ -122,74 +123,13 @@ func TestShortenURL(t *testing.T) {
 	})
 }
 
-func TestExpandURL(t *testing.T) {
-	urlShortener := setUpShortener()
-	t.Run("shortened url should return original url", func(t *testing.T) {
-		shortLink, err := urlShortener.ShortenURL(google)
-		assertNoError(t, err)
-		originalLink, _ := urlShortener.ExpandURL(shortLink)
-		assertEqualURL(t, google, originalLink)
+func TestNewURLShortener(t *testing.T) {
+	config := shortener.NewDefaultConfig()
+	encoder := MockEncoder{}
 
-		shortLink2, err := urlShortener.ShortenURL(originalLink)
-		assertNoError(t, err)
+	urlShortener := shortener.NewURLShortener(config, &encoder)
 
-		assertEqualURL(t, shortLink, shortLink2)
-	})
-
-	t.Run("expect error when expanding non existent URLs", func(t *testing.T) {
-		_, err := urlShortener.ExpandURL(google)
-		expectedError := shortener.ShortURLNotFoundError{ShortURL: google}
-		assertError(t, err)
-		if !errors.As(err, &expectedError) {
-			t.Fatalf("expected error %v but got none", expectedError.Error())
-		}
-	})
-
-}
-
-func TestConcurrentOperations(t *testing.T) {
-	urlShortener := setUpShortener()
-
-	cases := []string{
-		youtube,
-		google,
-		github,
-	}
-
-	results := make(map[string]string)
-
-	var wg sync.WaitGroup
-
-	for _, url := range cases {
-		wg.Add(1)
-		go func(url string) {
-			defer wg.Done()
-			shortLink, err := urlShortener.ShortenURL(url)
-			assertNoError(t, err)
-			results[url] = shortLink
-			assertSuffixLength(t, shortLink, urlShortener)
-
-			shortLink2, err := urlShortener.ShortenURL("example.com")
-			assertNoError(t, err)
-			assertSuffixLength(t, shortLink, urlShortener)
-			assertNotEqualURL(t, shortLink, shortLink2)
-		}(url)
-	}
-
-	wg.Wait()
-
-	assertEqual(t, len(cases), len(results))
-	shortLink, err := urlShortener.ShortenURL(cases[0])
-	expandedLink, _ := urlShortener.ExpandURL(shortLink)
-	assertEqualURL(t, expandedLink, cases[0])
-	assertNoError(t, err)
-
-	for originalURL, shortURL := range results {
-		shortLink, _ := urlShortener.ShortenURL(originalURL)
-		assertEqualURL(t, shortLink, shortURL)
-		expandedLink, _ := urlShortener.ExpandURL(shortLink)
-		assertEqualURL(t, originalURL, expandedLink)
-	}
+	assertEqual(t, urlShortener.Config, config)
 }
 
 func setUpShortener() *shortener.URLShortener {
@@ -226,14 +166,6 @@ func assertError(t testing.TB, err error) {
 	}
 }
 
-func assertEqualURL(t testing.TB, got, want string) {
-	t.Helper()
-
-	if got != want {
-		t.Errorf("got different short links for the same url : %v, %v", got, want)
-	}
-}
-
 func assertNotEqualURL(t testing.TB, got, want string) {
 	t.Helper()
 
@@ -246,5 +178,12 @@ func assertNoError(t testing.TB, err error) {
 	t.Helper()
 	if err != nil {
 		t.Errorf("should not have gotten an error but got error %q", err)
+	}
+}
+
+func assertValidShortURL(t testing.TB, shortLink string, urlShortener *shortener.URLShortener) {
+	t.Helper()
+	if !strings.HasPrefix(shortLink, urlShortener.Config.Domain()) {
+		t.Errorf("short link %s does not have expected domain prefix, expected domain %s", shortLink, urlShortener.Config.Domain())
 	}
 }
