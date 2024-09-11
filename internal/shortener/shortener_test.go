@@ -31,7 +31,7 @@ func (m *MockEncoder) Encode(num uint64) string {
 
 func TestShortenURL(t *testing.T) {
 	t.Run("shorten new urls", func(t *testing.T) {
-		urlShortener := setUpShortener()
+		urlShortener, _ := setUpShortener()
 
 		shortLink, err := urlShortener.ShortenURL(google)
 		assertNoError(t, err)
@@ -49,8 +49,20 @@ func TestShortenURL(t *testing.T) {
 		assertValidShortURL(t, shortLink3, urlShortener)
 	})
 
+	t.Run("counter correctly increments when shortening url ", func(t *testing.T) {
+		urlShortener, encoder := setUpShortener()
+		urlShortener.ShortenURL(google)
+		assertEqual(t, urlShortener.Config.URLCounter(), encoder.encodeCalls[0])
+
+		urlShortener.ShortenURL(google)
+		assertEqual(t, urlShortener.Config.URLCounter(), encoder.encodeCalls[1])
+
+		assertEqual(t, len(encoder.encodeCalls), 2)
+
+	})
+
 	t.Run("shorten same base url results in new short links", func(t *testing.T) {
-		urlShortener := setUpShortener()
+		urlShortener, _ := setUpShortener()
 
 		shortLink, _ := urlShortener.ShortenURL(google)
 		shortLink2, _ := urlShortener.ShortenURL(google)
@@ -59,7 +71,7 @@ func TestShortenURL(t *testing.T) {
 	})
 
 	t.Run("handle invalid urls", func(t *testing.T) {
-		urlShortener := setUpShortener()
+		urlShortener, _ := setUpShortener()
 
 		cases := []struct {
 			baseURL     string
@@ -79,7 +91,7 @@ func TestShortenURL(t *testing.T) {
 	})
 
 	t.Run("correct suffix length", func(t *testing.T) {
-		urlShortener := setUpShortener()
+		urlShortener, _ := setUpShortener()
 
 		for i := 0; i < 1000; i++ {
 			shortLink, _ := urlShortener.ShortenURL(fmt.Sprintf("example%d.com", i))
@@ -132,15 +144,15 @@ func TestNewURLShortener(t *testing.T) {
 	assertEqual(t, urlShortener.Config, config)
 }
 
-func setUpShortener() *shortener.URLShortener {
+func setUpShortener() (*shortener.URLShortener, *MockEncoder) {
 	defaultConfig := shortener.NewDefaultConfig()
-	encoder := MockEncoder{
+	mockEncoder := MockEncoder{
 		encodeFunc: func(num uint64) string {
 			return fmt.Sprintf("%07d", num)
 		},
 	}
-	urlShortener := shortener.NewURLShortener(defaultConfig, &encoder) // nil loads in default config
-	return urlShortener
+	urlShortener := shortener.NewURLShortener(defaultConfig, &mockEncoder) // nil loads in default config
+	return urlShortener, &mockEncoder
 }
 
 func assertSuffixLength(t testing.TB, shortLink string, shortener *shortener.URLShortener) {
