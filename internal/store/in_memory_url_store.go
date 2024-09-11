@@ -8,10 +8,11 @@ type InMemoryURLStore struct {
 	store map[string]string
 }
 
-func (i *InMemoryURLStore) GetExpandedURL(shortLink string) string {
-	return i.store[shortLink]
+func (i *InMemoryURLStore) Load(shortLink string) (string, bool) {
+	baseURL, found := i.store[shortLink]
+	return baseURL, found
 }
 
-func (i *InMemoryURLStore) RecordBaseURL(shortLink string) {
-	i.store[shortLink] = shortLink
+func (i *InMemoryURLStore) Save(baseURL, shortLink string) {
+	i.store[baseURL] = shortLink
 }
