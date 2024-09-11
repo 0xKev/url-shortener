@@ -35,7 +35,7 @@ func (m MockURLShortener) GetExpandedURL(shortLink string) string {
 	return ""
 }
 
-func (m MockURLShortener) ShortenBaseURL(baseURL string) string {
+func (m MockURLShortener) ShortenURL(baseURL string) string {
 	if m.ShortenBaseURLFunc != nil {
 		return m.ShortenBaseURLFunc(baseURL)
 	}

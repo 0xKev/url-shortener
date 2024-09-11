@@ -12,8 +12,7 @@ const (
 )
 
 type URLShortener interface {
-	GetExpandedURL(shortLink string) string
-	ShortenBaseURL(baseURL string) string
+	ShortenURL(baseURL string) string
 }
 
 type URLShortenerServer struct {
@@ -48,7 +47,7 @@ func (u *URLShortenerServer) showExpandedURL(w http.ResponseWriter, r *http.Requ
 
 func (u *URLShortenerServer) processShortURL(w http.ResponseWriter, r *http.Request) {
 	baseURL := strings.TrimPrefix(r.URL.Path, ShortenRoute)
-	shortURL := u.shortener.ShortenBaseURL(baseURL)
+	shortURL := u.shortener.ShortenURL(baseURL)
 	w.WriteHeader(http.StatusAccepted)
 	u.store.Save(baseURL, shortURL)
 
