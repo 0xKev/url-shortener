@@ -29,17 +29,24 @@ type MockURLShortener struct {
 }
 
 func (m MockURLShortener) GetExpandedURL(shortLink string) string {
-	return m.GetExpandedURLFunc(shortLink)
+	if m.GetExpandedURLFunc != nil {
+		return m.GetExpandedURLFunc(shortLink)
+	}
+	return ""
 }
 
 func (m MockURLShortener) ShortenBaseURL(baseURL string) string {
-	return "mock shortened url"
+	if m.ShortenBaseURLFunc != nil {
+		return m.ShortenBaseURLFunc(baseURL)
+	}
+	return ""
 }
 
+var googleShortPrefix = "0000001"
+var githubShortPrefix = "0000002"
+var doesNotExistShortPrefix = "1000000"
+
 func TestGETExpandShortURL(t *testing.T) {
-	var googleShortPrefix = "0000001"
-	var githubShortPrefix = "0000002"
-	var doesNotExistShortPrefix = "1000000"
 	store := StubURLStore{
 		urlMap: map[string]string{
 			googleShortPrefix: "google.com",
@@ -97,7 +104,11 @@ func TestCreateShortURL(t *testing.T) {
 		map[string]string{},
 		nil,
 	}
-	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
+	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
+		ShortenBaseURLFunc: func(baseURL string) string {
+			return "0000001"
+		},
+	})
 
 	t.Run("records baseURL on POST", func(t *testing.T) {
 		baseUrl := "google.com"
@@ -107,7 +118,7 @@ func TestCreateShortURL(t *testing.T) {
 		testutil.AssertStatus(t, response.Code, http.StatusAccepted)
 
 		if len(store.shortURLCalls) != 1 {
-			t.Fatalf("got %d calls to RecordBaseURL want %d", len(store.shortURLCalls), 1)
+			t.Fatalf("got %d calls to shortURLCalls want %d", len(store.shortURLCalls), 1)
 		}
 
 		if store.shortURLCalls[0] != baseUrl {
