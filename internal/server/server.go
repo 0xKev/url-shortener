@@ -12,7 +12,7 @@ const (
 )
 
 type URLShortener interface {
-	ShortenURL(baseURL string) string
+	ShortenURL(baseURL string) (string, error)
 }
 
 type URLShortenerServer struct {
@@ -47,7 +47,11 @@ func (u *URLShortenerServer) showExpandedURL(w http.ResponseWriter, r *http.Requ
 
 func (u *URLShortenerServer) processShortURL(w http.ResponseWriter, r *http.Request) {
 	baseURL := strings.TrimPrefix(r.URL.Path, ShortenRoute)
-	shortURL := u.shortener.ShortenURL(baseURL)
+	shortURL, err := u.shortener.ShortenURL(baseURL)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Could not shorten URL: %v", err), http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusAccepted)
 	u.store.Save(baseURL, shortURL)
 

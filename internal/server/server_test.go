@@ -25,7 +25,7 @@ func (s *StubURLStore) Load(shortLink string) (string, bool) {
 
 type MockURLShortener struct {
 	GetExpandedURLFunc func(shortLink string) string
-	ShortenBaseURLFunc func(baseURL string) string
+	ShortenBaseURLFunc func(baseURL string) (string, error)
 }
 
 func (m MockURLShortener) GetExpandedURL(shortLink string) string {
@@ -35,11 +35,11 @@ func (m MockURLShortener) GetExpandedURL(shortLink string) string {
 	return ""
 }
 
-func (m MockURLShortener) ShortenURL(baseURL string) string {
+func (m MockURLShortener) ShortenURL(baseURL string) (string, error) {
 	if m.ShortenBaseURLFunc != nil {
 		return m.ShortenBaseURLFunc(baseURL)
 	}
-	return ""
+	return "", nil
 }
 
 var googleShortPrefix = "0000001"
@@ -105,8 +105,8 @@ func TestCreateShortURL(t *testing.T) {
 		nil,
 	}
 	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
-		ShortenBaseURLFunc: func(baseURL string) string {
-			return "0000001"
+		ShortenBaseURLFunc: func(baseURL string) (string, error) {
+			return "0000001", nil
 		},
 	})
 
