@@ -54,7 +54,7 @@ func (u *URLShortenerServer) processShortURL(w http.ResponseWriter, r *http.Requ
 	}
 	w.WriteHeader(http.StatusAccepted)
 	u.store.Save(baseURL, shortURL)
-
+	fmt.Fprint(w, shortURL)
 }
 
 type URLStore interface {

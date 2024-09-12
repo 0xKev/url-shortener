@@ -42,53 +42,51 @@ func (m MockURLShortener) ShortenURL(baseURL string) (string, error) {
 	return "", nil
 }
 
-var googleShortPrefix = "0000001"
-var githubShortPrefix = "0000002"
-var doesNotExistShortPrefix = "1000000"
+var googleShortSuffix = "0000001"
+var githubShortSuffix = "0000002"
+var doesNotExistShortSuffix = "1000000"
 
 func TestGETExpandShortURL(t *testing.T) {
 	store := StubURLStore{
 		urlMap: map[string]string{
-			googleShortPrefix: "google.com",
-			githubShortPrefix: "github.com",
+			googleShortSuffix: "google.com",
+			githubShortSuffix: "github.com",
 		},
 	}
 
 	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
 		GetExpandedURLFunc: func(shortLink string) string {
 			switch shortLink {
-			case googleShortPrefix:
-				return store.urlMap[googleShortPrefix]
-			case githubShortPrefix:
-				return store.urlMap[githubShortPrefix]
+			case googleShortSuffix:
+				return store.urlMap[googleShortSuffix]
+			case githubShortSuffix:
+				return store.urlMap[githubShortSuffix]
 			default:
 				return ""
 			}
 		},
 	})
 
-	t.Run("returns google.com", func(t *testing.T) {
-		request := testutil.NewGetExpandedURLRequest(googleShortPrefix)
+	t.Run("returns google.com via short suffix", func(t *testing.T) {
+		request := testutil.NewGetExpandedURLRequest(googleShortSuffix)
 		response := httptest.NewRecorder()
 
 		shortenerServer.ServeHTTP(response, request)
-		testutil.AssertResponseBody(t, response.Body.String(), store.urlMap[googleShortPrefix])
-
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
+		testutil.AssertResponseBody(t, response.Body.String(), store.urlMap[googleShortSuffix])
 	})
 
-	t.Run("returns github.com", func(t *testing.T) {
-		request := testutil.NewGetExpandedURLRequest(githubShortPrefix)
+	t.Run("returns github.com via short suffix", func(t *testing.T) {
+		request := testutil.NewGetExpandedURLRequest(githubShortSuffix)
 		response := httptest.NewRecorder()
 
 		shortenerServer.ServeHTTP(response, request)
-		testutil.AssertResponseBody(t, response.Body.String(), store.urlMap[githubShortPrefix])
-
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
+		testutil.AssertResponseBody(t, response.Body.String(), store.urlMap[githubShortSuffix])
 	})
 
 	t.Run("returns 404 on missing short links", func(t *testing.T) {
-		request := testutil.NewGetExpandedURLRequest(doesNotExistShortPrefix)
+		request := testutil.NewGetExpandedURLRequest(doesNotExistShortSuffix)
 		response := httptest.NewRecorder()
 
 		shortenerServer.ServeHTTP(response, request)
