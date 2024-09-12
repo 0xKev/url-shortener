@@ -6,12 +6,12 @@ import (
 )
 
 func NewGetExpandedURLRequest(shortSuffix string) *http.Request {
-	request, _ := http.NewRequest("GET", "/expand/"+shortSuffix, nil)
+	request, _ := http.NewRequest(http.MethodGet, "/expand/"+shortSuffix, nil)
 	return request
 }
 
 func NewPostShortURLRequest(baseURL string) *http.Request {
-	request, _ := http.NewRequest("POST", "/shorten/"+baseURL, nil)
+	request, _ := http.NewRequest(http.MethodPost, "/shorten/"+baseURL, nil)
 	return request
 }
 
