@@ -140,6 +140,26 @@ func TestNewURLShortener(t *testing.T) {
 	assertEqual(t, urlShortener.Config, config)
 }
 
+func TestConcurrentShortening(t *testing.T) {
+	urlShortener, _ := setUpShortener()
+
+	for i := 0; i < 1000; i++ {
+		go func(baseURL string) {
+			shortLink, _ := urlShortener.ShortenURL(baseURL)
+			assertSuffixLength(t, shortLink, urlShortener)
+		}(fmt.Sprintf("example%d.com", i))
+	}
+}
+
+func BenchmarkValidShortening(b *testing.B) {
+	urlShortener, _ := setUpShortener()
+	b.ResetTimer()
+	for i := 0; i < 1000; i++ {
+		shortLink, _ := urlShortener.ShortenURL(fmt.Sprintf("example%d.com", i))
+		assertSuffixLength(b, shortLink, urlShortener)
+	}
+}
+
 func setUpShortener() (*shortener.URLShortener, *MockEncoder) {
 	defaultConfig := shortener.NewDefaultConfig()
 	mockEncoder := MockEncoder{
