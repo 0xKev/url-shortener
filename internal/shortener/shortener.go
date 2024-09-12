@@ -116,7 +116,7 @@ func (u *URLShortener) ShortenURL(baseURL string) (string, error) {
 		return "", err
 	}
 
-	return u.generateShortURL(), nil
+	return u.generateShortSuffix(), nil
 }
 
 func (u *URLShortener) isOverCounterLimit() (bool, error) {
@@ -127,10 +127,6 @@ func (u *URLShortener) isOverCounterLimit() (bool, error) {
 		}
 	}
 	return false, nil
-}
-
-func (u *URLShortener) generateShortURL() string {
-	return fmt.Sprint(u.Config.domain + u.generateShortSuffix())
 }
 
 func (u *URLShortener) validateURL(link string) error {

@@ -3,7 +3,6 @@ package shortener_test
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 
 	shortener "github.com/0xKev/url-shortener/internal/shortener"
@@ -36,17 +35,14 @@ func TestShortenURL(t *testing.T) {
 		shortLink, err := urlShortener.ShortenURL(google)
 		assertNoError(t, err)
 		assertSuffixLength(t, shortLink, urlShortener)
-		assertValidShortURL(t, shortLink, urlShortener)
 
 		shortLink2, err := urlShortener.ShortenURL(youtube)
 		assertNoError(t, err)
 		assertSuffixLength(t, shortLink2, urlShortener)
-		assertValidShortURL(t, shortLink2, urlShortener)
 
 		shortLink3, err := urlShortener.ShortenURL(github)
 		assertNoError(t, err)
 		assertSuffixLength(t, shortLink3, urlShortener)
-		assertValidShortURL(t, shortLink3, urlShortener)
 	})
 
 	t.Run("counter correctly increments when shortening url ", func(t *testing.T) {
@@ -155,10 +151,9 @@ func setUpShortener() (*shortener.URLShortener, *MockEncoder) {
 	return urlShortener, &mockEncoder
 }
 
-func assertSuffixLength(t testing.TB, shortLink string, shortener *shortener.URLShortener) {
+func assertSuffixLength(t testing.TB, shortSuffix string, shortener *shortener.URLShortener) {
 	t.Helper()
 
-	shortSuffix := strings.TrimPrefix(shortLink, shortener.Config.Domain())
 	if len(shortSuffix) != int(shortener.Config.URLSuffixLength()) {
 		t.Fatalf("got %d short suffix length, expected %d", len(shortSuffix), shortener.Config.URLSuffixLength())
 	}
@@ -190,12 +185,5 @@ func assertNoError(t testing.TB, err error) {
 	t.Helper()
 	if err != nil {
 		t.Errorf("should not have gotten an error but got error %q", err)
-	}
-}
-
-func assertValidShortURL(t testing.TB, shortLink string, urlShortener *shortener.URLShortener) {
-	t.Helper()
-	if !strings.HasPrefix(shortLink, urlShortener.Config.Domain()) {
-		t.Errorf("short link %s does not have expected domain prefix, expected domain %s", shortLink, urlShortener.Config.Domain())
 	}
 }
