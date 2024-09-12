@@ -13,6 +13,6 @@ func (i *InMemoryURLStore) Load(shortLink string) (string, bool) {
 	return baseURL, found
 }
 
-func (i *InMemoryURLStore) Save(baseURL, shortLink string) {
-	i.store[baseURL] = shortLink
+func (i *InMemoryURLStore) Save(shortLink, baseURL string) {
+	i.store[shortLink] = baseURL
 }
