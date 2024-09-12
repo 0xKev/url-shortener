@@ -102,13 +102,14 @@ func TestCreateShortURL(t *testing.T) {
 		map[string]string{},
 		nil,
 	}
+	var expectedShortSuffix = "0000001"
 	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
 		ShortenBaseURLFunc: func(baseURL string) (string, error) {
-			return "0000001", nil
+			return expectedShortSuffix, nil
 		},
 	})
 
-	t.Run("records baseURL on POST", func(t *testing.T) {
+	t.Run("records google.com on POST request", func(t *testing.T) {
 		baseUrl := "google.com"
 		response := httptest.NewRecorder()
 		request := testutil.NewPostShortURLRequest(baseUrl)
@@ -119,8 +120,8 @@ func TestCreateShortURL(t *testing.T) {
 			t.Fatalf("got %d calls to shortURLCalls want %d", len(store.shortURLCalls), 1)
 		}
 
-		if store.shortURLCalls[0] != baseUrl {
-			t.Errorf("did not store correct url got %q, want %q", store.shortURLCalls[0], baseUrl)
+		if store.shortURLCalls[0] != expectedShortSuffix {
+			t.Errorf("did not store correct url got %q, want %q", store.shortURLCalls[0], expectedShortSuffix)
 		}
 	})
 }
