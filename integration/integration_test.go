@@ -25,26 +25,28 @@ func TestRecordingBaseURLsAndRetrievingThem(t *testing.T) {
 
 	shortenerConfig := shortener.NewDefaultConfig()
 	shortenerConfig.SetDomain(domain)
+	shortenerConfig.SetURLCounter(0)
 
-	urlShortener := shortener.NewURLShortener(nil, encoder)
+	urlShortener := shortener.NewURLShortener(shortenerConfig, encoder)
 	store := memory_store.NewInMemoryURLStore()
-	shortenerServer := server.NewURLShortenerServer(store)
+	shortenerServer := server.NewURLShortenerServer(store, urlShortener)
 
 	testcases := map[string]string{
-		"google.com": domain + "0000000",
-		"reddit.com": domain + "0000001",
-		"github.com": domain + "0000002",
+		"google.com": "0000001",
+		"reddit.com": "0000002",
+		"github.com": "0000003",
 	}
 
-	for baseURL, _ := range testcases {
-		shortURL, _ := urlShortener.ShortenURL(baseURL)
-		t.Log(shortURL)
-		shortenerServer.ServeHTTP(httptest.NewRecorder(), testutil.NewPostShortURLRequest(baseURL))
-	}
-
-	for baseURL, shortURL := range testcases {
+	for baseURL, shortLink := range testcases {
 		response := httptest.NewRecorder()
-		shortenerServer.ServeHTTP(response, testutil.NewGetExpandedURLRequest(shortURL))
+		shortenerServer.ServeHTTP(response, testutil.NewPostShortURLRequest(baseURL))
+		testutil.AssertStatus(t, response.Code, http.StatusAccepted)
+		testutil.AssertResponseBody(t, response.Body.String(), shortLink)
+	}
+
+	for baseURL, shortSuffix := range testcases {
+		response := httptest.NewRecorder()
+		shortenerServer.ServeHTTP(response, testutil.NewGetExpandedURLRequest(shortSuffix))
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
 		testutil.AssertResponseBody(t, response.Body.String(), baseURL)
 	}
