@@ -150,3 +150,32 @@ func TestConcurrentGETExpandShortURL(t *testing.T) {
 		t.Errorf("expected %d calls to get base url but got %d calls", requestCount, len(store.shortURLCalls))
 	}
 }
+
+func TestConcurrentCreateShortURL(t *testing.T) {
+	store := StubURLStore{
+		urlMap: map[string]string{
+			googleShortSuffix: "google.com",
+			githubShortSuffix: "github.com",
+		},
+	}
+
+	createCount := 1000
+	var wg sync.WaitGroup
+	wg.Add(createCount)
+
+	for i := 0; i < createCount; i++ {
+		go func() {
+			defer wg.Done()
+			shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
+			response := httptest.NewRecorder()
+			request := testutil.NewPostShortURLRequest(store.urlMap[googleShortSuffix])
+			shortenerServer.ServeHTTP(response, request)
+
+			testutil.AssertStatus(t, response.Code, http.StatusAccepted)
+		}()
+	}
+	wg.Wait()
+	if len(store.shortURLCalls) != createCount {
+		t.Errorf("expected %d calls to create short url but got %d", createCount, len(store.shortURLCalls))
+	}
+}
