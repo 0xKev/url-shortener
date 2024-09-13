@@ -162,11 +162,11 @@ func TestConcurrentCreateShortURL(t *testing.T) {
 	createCount := 1000
 	var wg sync.WaitGroup
 	wg.Add(createCount)
+	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
 
 	for i := 0; i < createCount; i++ {
 		go func() {
 			defer wg.Done()
-			shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
 			response := httptest.NewRecorder()
 			request := testutil.NewPostShortURLRequest(store.urlMap[googleShortSuffix])
 			shortenerServer.ServeHTTP(response, request)
@@ -177,5 +177,53 @@ func TestConcurrentCreateShortURL(t *testing.T) {
 	wg.Wait()
 	if len(store.shortURLCalls) != createCount {
 		t.Errorf("expected %d calls to create short url but got %d", createCount, len(store.shortURLCalls))
+	}
+}
+
+func TestConcurrentCreateAndGetShortURL(t *testing.T) {
+	store := StubURLStore{
+		urlMap: map[string]string{
+			googleShortSuffix: "google.com",
+			githubShortSuffix: "github.com",
+		},
+	}
+
+	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
+
+	requestCount := 1000
+	createCount := 2000
+
+	var wg sync.WaitGroup
+	wg.Add(requestCount + createCount)
+
+	for i := 0; i < requestCount; i++ {
+		go func() {
+			defer wg.Done()
+			response := httptest.NewRecorder()
+			request := testutil.NewGetExpandedURLRequest(googleShortSuffix)
+			shortenerServer.ServeHTTP(response, request)
+
+			testutil.AssertStatus(t, response.Code, http.StatusOK)
+		}()
+	}
+
+	for j := 0; j < createCount; j++ {
+		go func() {
+			defer wg.Done()
+			response := httptest.NewRecorder()
+			request := testutil.NewPostShortURLRequest(store.urlMap[githubShortSuffix])
+			shortenerServer.ServeHTTP(response, request)
+
+			testutil.AssertStatus(t, response.Code, http.StatusAccepted)
+		}()
+	}
+	wg.Wait()
+
+	if len(store.shortURLCalls) != createCount {
+		t.Errorf("expected %d calls to create short url but got %d", createCount, len(store.shortURLCalls))
+	}
+
+	if len(store.getURLCalls) != requestCount {
+		t.Errorf("expected %d calls to get base url but got %d calls", requestCount, len(store.shortURLCalls))
 	}
 }
