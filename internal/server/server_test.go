@@ -3,6 +3,7 @@ package server_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
 	server "github.com/0xKev/url-shortener/internal/server"
@@ -12,27 +13,26 @@ import (
 type StubURLStore struct {
 	urlMap        map[string]string
 	shortURLCalls []string
+	getURLCalls   []string
+	mu            sync.Mutex
 }
 
 func (s *StubURLStore) Save(baseURL, shortLink string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.shortURLCalls = append(s.shortURLCalls, baseURL)
 }
 
 func (s *StubURLStore) Load(shortLink string) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	baseURL, found := s.urlMap[shortLink]
+	s.getURLCalls = append(s.getURLCalls, baseURL)
 	return baseURL, found
 }
 
 type MockURLShortener struct {
-	GetExpandedURLFunc func(shortLink string) string
 	ShortenBaseURLFunc func(baseURL string) (string, error)
-}
-
-func (m MockURLShortener) GetExpandedURL(shortLink string) string {
-	if m.GetExpandedURLFunc != nil {
-		return m.GetExpandedURLFunc(shortLink)
-	}
-	return ""
 }
 
 func (m MockURLShortener) ShortenURL(baseURL string) (string, error) {
@@ -54,35 +54,27 @@ func TestGETExpandShortURL(t *testing.T) {
 		},
 	}
 
-	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
-		GetExpandedURLFunc: func(shortLink string) string {
-			switch shortLink {
-			case googleShortSuffix:
-				return store.urlMap[googleShortSuffix]
-			case githubShortSuffix:
-				return store.urlMap[githubShortSuffix]
-			default:
-				return ""
-			}
-		},
-	})
+	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
 
-	t.Run("returns google.com via short suffix", func(t *testing.T) {
-		request := testutil.NewGetExpandedURLRequest(googleShortSuffix)
-		response := httptest.NewRecorder()
+	t.Run("returns correct base url via short suffix", func(t *testing.T) {
+		getGoogleReq := testutil.NewGetExpandedURLRequest(googleShortSuffix)
+		getGoogleResponse := httptest.NewRecorder()
+		expectedCalls := 2
 
-		shortenerServer.ServeHTTP(response, request)
-		testutil.AssertStatus(t, response.Code, http.StatusOK)
-		testutil.AssertResponseBody(t, response.Body.String(), store.urlMap[googleShortSuffix])
-	})
+		shortenerServer.ServeHTTP(getGoogleResponse, getGoogleReq)
+		testutil.AssertStatus(t, getGoogleResponse.Code, http.StatusOK)
+		testutil.AssertResponseBody(t, getGoogleResponse.Body.String(), store.urlMap[googleShortSuffix])
 
-	t.Run("returns github.com via short suffix", func(t *testing.T) {
-		request := testutil.NewGetExpandedURLRequest(githubShortSuffix)
-		response := httptest.NewRecorder()
+		getGithubReq := testutil.NewGetExpandedURLRequest(githubShortSuffix)
+		getGithubResponse := httptest.NewRecorder()
 
-		shortenerServer.ServeHTTP(response, request)
-		testutil.AssertStatus(t, response.Code, http.StatusOK)
-		testutil.AssertResponseBody(t, response.Body.String(), store.urlMap[githubShortSuffix])
+		shortenerServer.ServeHTTP(getGithubResponse, getGithubReq)
+		testutil.AssertStatus(t, getGithubResponse.Code, http.StatusOK)
+		testutil.AssertResponseBody(t, getGithubResponse.Body.String(), store.urlMap[githubShortSuffix])
+
+		if len(store.getURLCalls) != expectedCalls {
+			t.Errorf("expected %d calls to get base url but got %d calls", expectedCalls, len(store.getURLCalls))
+		}
 	})
 
 	t.Run("returns 404 on missing short links", func(t *testing.T) {
@@ -101,6 +93,8 @@ func TestCreateShortURL(t *testing.T) {
 	store := StubURLStore{
 		map[string]string{},
 		nil,
+		nil,
+		sync.Mutex{},
 	}
 	var expectedShortSuffix = "0000001"
 	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
@@ -124,4 +118,35 @@ func TestCreateShortURL(t *testing.T) {
 			t.Errorf("did not store correct url got %q, want %q", store.shortURLCalls[0], expectedShortSuffix)
 		}
 	})
+}
+
+func TestConcurrentGETExpandShortURL(t *testing.T) {
+	store := StubURLStore{
+		urlMap: map[string]string{
+			googleShortSuffix: "google.com",
+			githubShortSuffix: "github.com",
+		},
+	}
+
+	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
+	requestCount := 1000
+
+	var wg sync.WaitGroup
+	wg.Add(requestCount)
+
+	for i := 0; i < requestCount; i++ {
+		go func() {
+			defer wg.Done()
+			response := httptest.NewRecorder()
+			request := testutil.NewGetExpandedURLRequest(googleShortSuffix)
+			shortenerServer.ServeHTTP(response, request)
+			testutil.AssertStatus(t, response.Code, http.StatusOK)
+			testutil.AssertResponseBody(t, response.Body.String(), store.urlMap[googleShortSuffix])
+		}()
+	}
+	wg.Wait()
+
+	if len(store.getURLCalls) != requestCount {
+		t.Errorf("expected %d calls to get base url but got %d calls", requestCount, len(store.shortURLCalls))
+	}
 }
