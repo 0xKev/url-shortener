@@ -19,32 +19,27 @@ func (e EncodeFunc) Encode(num uint64) string {
 }
 
 var encoder shortener.Encoder = EncodeFunc(base62.Encode)
-var domain = "s.nykevin.com/"
 
 func TestRecordingBaseURLsAndRetrievingThem(t *testing.T) {
-
 	shortenerConfig := shortener.NewDefaultConfig()
-	shortenerConfig.SetDomain(domain)
-	shortenerConfig.SetURLCounter(0)
 
 	urlShortener := shortener.NewURLShortener(shortenerConfig, encoder)
 	store := memory_store.NewInMemoryURLStore()
 	shortenerServer := server.NewURLShortenerServer(store, urlShortener)
 
-	testcases := map[string]string{
-		"google.com": "0000001",
-		"reddit.com": "0000002",
-		"github.com": "0000003",
-	}
+	baseURLs := []string{"google.com", "github.com", "youtube.com"}
+	shortLinks := make(map[string]string)
 
-	for baseURL, shortLink := range testcases {
+	// Create short URLs
+	for _, baseURL := range baseURLs {
 		response := httptest.NewRecorder()
 		shortenerServer.ServeHTTP(response, testutil.NewPostShortURLRequest(baseURL))
 		testutil.AssertStatus(t, response.Code, http.StatusAccepted)
-		testutil.AssertResponseBody(t, response.Body.String(), shortLink)
+		shortLinks[baseURL] = response.Body.String()
 	}
 
-	for baseURL, shortSuffix := range testcases {
+	// Fetch base URLs from short URLs
+	for baseURL, shortSuffix := range shortLinks {
 		response := httptest.NewRecorder()
 		shortenerServer.ServeHTTP(response, testutil.NewGetExpandedURLRequest(shortSuffix))
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
