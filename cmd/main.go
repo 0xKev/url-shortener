@@ -7,7 +7,7 @@ import (
 	"github.com/0xKev/url-shortener/internal/base62"
 	"github.com/0xKev/url-shortener/internal/server"
 	"github.com/0xKev/url-shortener/internal/shortener"
-	store "github.com/0xKev/url-shortener/internal/store"
+	store "github.com/0xKev/url-shortener/internal/store/memory"
 )
 
 type EncoderFunc func(num uint64) string

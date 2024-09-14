@@ -8,7 +8,7 @@ import (
 	"github.com/0xKev/url-shortener/internal/base62"
 	"github.com/0xKev/url-shortener/internal/server"
 	"github.com/0xKev/url-shortener/internal/shortener"
-	memory_store "github.com/0xKev/url-shortener/internal/store"
+	memory_store "github.com/0xKev/url-shortener/internal/store/memory"
 	"github.com/0xKev/url-shortener/internal/testutil"
 )
 
