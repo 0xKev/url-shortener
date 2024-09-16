@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -46,6 +47,7 @@ func (m MockURLShortener) ShortenURL(baseURL string) (string, error) {
 var googleShortSuffix = "0000001"
 var githubShortSuffix = "0000002"
 var doesNotExistShortSuffix = "1000000"
+var invalidBaseURL = ""
 
 func TestGETExpandShortURL(t *testing.T) {
 	store := StubURLStore{
@@ -100,6 +102,9 @@ func TestCreateShortURL(t *testing.T) {
 	var expectedShortSuffix = "0000001"
 	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
 		ShortenBaseURLFunc: func(baseURL string) (string, error) {
+			if baseURL == invalidBaseURL {
+				return "", fmt.Errorf("invalid baseURL %v", baseURL)
+			}
 			return expectedShortSuffix, nil
 		},
 	})
@@ -118,6 +123,15 @@ func TestCreateShortURL(t *testing.T) {
 		if store.shortURLCalls[0] != expectedShortSuffix {
 			t.Errorf("did not store correct url got %q, want %q", store.shortURLCalls[0], expectedShortSuffix)
 		}
+	})
+
+	t.Run("error on invalid url POST request", func(t *testing.T) {
+		response := httptest.NewRecorder()
+
+		request := testutil.NewPostShortURLRequest(invalidBaseURL)
+		shortenerServer.ServeHTTP(response, request)
+
+		testutil.AssertStatus(t, response.Code, http.StatusInternalServerError)
 	})
 }
 
@@ -227,4 +241,26 @@ func TestConcurrentCreateAndGetShortURL(t *testing.T) {
 	if len(store.getURLCalls) != requestCount {
 		t.Errorf("expected %d calls to get base url but got %d calls", requestCount, len(store.shortURLCalls))
 	}
+}
+
+func TestInvalidRequestsRoute(t *testing.T) {
+	shortenerServer := server.NewURLShortenerServer(&StubURLStore{}, MockURLShortener{})
+	t.Run("GET request to invalid path", func(t *testing.T) {
+		response := httptest.NewRecorder()
+		request, _ := http.NewRequest(http.MethodGet, "/badGet/", nil)
+
+		shortenerServer.ServeHTTP(response, request)
+
+		testutil.AssertStatus(t, response.Code, http.StatusNotFound)
+	})
+
+	t.Run("POST request to invalid path", func(t *testing.T) {
+		response := httptest.NewRecorder()
+		request, _ := http.NewRequest(http.MethodPost, "/badPost/", nil)
+
+		shortenerServer.ServeHTTP(response, request)
+
+		testutil.AssertStatus(t, response.Code, http.StatusNotFound)
+	})
+
 }
