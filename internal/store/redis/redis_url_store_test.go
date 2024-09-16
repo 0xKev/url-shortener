@@ -11,26 +11,6 @@ import (
 const shortLink = "s.shorten.com/000000"
 const baseURL = "google.com"
 
-func TestSavingAndRetrievingFromRedis(t *testing.T) {
-	// IMPORTANT - ENSURE DB IS MEANT ONLY FOR TESTING BECAUSE FLUSHALL RUNS EVERYTIME
-	client := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "",
-		DB:       9, // use only DB 9 for tests
-	})
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-
-	defer client.Close()
-
-	defer cancel()
-
-	pingRedis(t, ctx, client)
-	storeString(t, ctx, client, shortLink, baseURL)
-	retrieveString(t, ctx, client, shortLink, baseURL)
-	client.FlushAll(ctx)
-}
-
 func pingRedis(t testing.TB, ctx context.Context, client *redis.Client) {
 	t.Helper()
 
@@ -62,7 +42,7 @@ func retrieveString(t testing.TB, ctx context.Context, client *redis.Client, sho
 	}
 }
 
-func TestRedisURLStoreImplementation(t *testing.T) {
+func setupClient() (*redis.Client, context.Context, context.CancelFunc) {
 	client := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: "",
@@ -70,6 +50,25 @@ func TestRedisURLStoreImplementation(t *testing.T) {
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+	return client, ctx, cancel
+}
+func TestSavingAndRetrievingFromRedis(t *testing.T) {
+	// IMPORTANT - ENSURE DB IS MEANT ONLY FOR TESTING BECAUSE FLUSHALL RUNS EVERYTIME
+	client, ctx, cancel := setupClient()
+
+	defer client.Close()
+
+	defer cancel()
+
+	pingRedis(t, ctx, client)
+	storeString(t, ctx, client, shortLink, baseURL)
+	retrieveString(t, ctx, client, shortLink, baseURL)
+	client.FlushAll(ctx)
+}
+
+func TestRedisURLStoreImplementation(t *testing.T) {
+	client, ctx, cancel := setupClient()
 
 	defer client.Close()
 	defer cancel()
