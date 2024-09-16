@@ -30,3 +30,15 @@ func AssertStatus(t testing.TB, got, want int) {
 		t.Errorf("did not get correct status, got %d, want %d", got, want)
 	}
 }
+
+func AssertNoError(t testing.TB, err error) {
+	if err != nil {
+		t.Errorf("expected no error but got %v", err)
+	}
+}
+
+func AssertError(t testing.TB, err error) {
+	if err == nil {
+		t.Error("expected an error but got none")
+	}
+}

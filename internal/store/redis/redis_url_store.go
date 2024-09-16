@@ -19,6 +19,9 @@ type RedisURLStore struct {
 }
 
 func NewRedisURLStore(config *redis.Options) (*RedisURLStore, error) {
+	if config == nil {
+		return nil, fmt.Errorf("invalid config")
+	}
 	client := redis.NewClient(config)
 	if err := validateRedisConfig(*client); err != nil {
 		return nil, err
@@ -31,7 +34,7 @@ func validateRedisConfig(client redis.Client) error {
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		return fmt.Errorf("unable to ping redis store %v", err)
+		return fmt.Errorf("can't continue - unable to ping redis store %v", err)
 	}
 
 	return nil

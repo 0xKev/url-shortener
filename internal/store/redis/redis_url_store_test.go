@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xKev/url-shortener/internal/testutil"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -53,6 +54,15 @@ func setupClient() (*redis.Client, context.Context, context.CancelFunc) {
 
 	return client, ctx, cancel
 }
+
+func setupConfigurableClient(config *redis.Options) (*redis.Client, context.Context, context.CancelFunc) {
+	client := redis.NewClient(config)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+	return client, ctx, cancel
+}
+
 func TestSavingAndRetrievingFromRedis(t *testing.T) {
 	// IMPORTANT - ENSURE DB IS MEANT ONLY FOR TESTING BECAUSE FLUSHALL RUNS EVERYTIME
 	client, ctx, cancel := setupClient()
@@ -69,23 +79,12 @@ func TestSavingAndRetrievingFromRedis(t *testing.T) {
 
 func TestRedisURLStoreImplementation(t *testing.T) {
 	client, ctx, cancel := setupClient()
-
-	defer client.Close()
 	defer cancel()
+	defer client.Close()
 
-	config := &redis.Options{
-		Addr:     "localhost:6379",
-		Password: "",
-		DB:       9, // use only DB 9 for tests
-	}
+	urlStore := RedisURLStore{client: client}
 
-	urlStore, err := NewRedisURLStore(config)
-
-	if err != nil {
-		t.Errorf("error creating client for url redis store, %v", err)
-	}
-
-	err = urlStore.Save(shortLink, baseURL)
+	err := urlStore.Save(shortLink, baseURL)
 
 	if err != nil {
 		t.Fatalf("Save method error, %v", err)
@@ -101,4 +100,24 @@ func TestRedisURLStoreImplementation(t *testing.T) {
 	if val != baseURL {
 		t.Errorf("expected %v but got %v", baseURL, val)
 	}
+}
+
+func TestRedisStoreConfig(t *testing.T) {
+	t.Run("create redis store with custom config", func(t *testing.T) {
+		config := &redis.Options{
+			Addr:     "localhost:6379",
+			Password: "",
+			DB:       9, // use only DB 9 for tests
+		}
+
+		_, err := NewRedisURLStore(config)
+
+		testutil.AssertNoError(t, err)
+	})
+
+	t.Run("expect error when creating redis store with nil config supplied", func(t *testing.T) {
+		_, err := NewRedisURLStore(nil)
+
+		testutil.AssertError(t, err)
+	})
 }
