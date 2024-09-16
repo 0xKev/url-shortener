@@ -10,7 +10,6 @@ import (
 	"github.com/0xKev/url-shortener/internal/shortener"
 	redis_store "github.com/0xKev/url-shortener/internal/store/redis"
 	"github.com/0xKev/url-shortener/internal/testutil"
-	"github.com/redis/go-redis/v9"
 )
 
 type EncodeFunc func(num uint64) string
@@ -21,15 +20,18 @@ func (e EncodeFunc) Encode(num uint64) string {
 
 var encoder shortener.Encoder = EncodeFunc(base62.Encode)
 
+const (
+	redisAddr = "localhost:6379"
+	redisPass = ""
+	redisDB   = 9 // use 9 for tests
+)
+
 func TestRecordingBaseURLsAndRetrievingThem(t *testing.T) {
 	shortenerConfig := shortener.NewDefaultConfig()
 
 	urlShortener := shortener.NewURLShortener(shortenerConfig, encoder)
-	storeConfig := &redis.Options{
-		Addr:     "localhost:6379",
-		Password: "",
-		DB:       9, // use only DB 9 for tests
-	}
+	storeConfig := redis_store.NewRedisConfig(redisAddr, redisPass, redisDB)
+
 	store, err := redis_store.NewRedisURLStore(storeConfig)
 	if err != nil {
 		t.Fatalf("error when creating redis store %v", err)
