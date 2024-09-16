@@ -18,22 +18,31 @@ type URLShortener interface {
 type URLShortenerServer struct {
 	store     URLStore
 	shortener URLShortener
+	http.Handler
 }
 
 func NewURLShortenerServer(store URLStore, shortener URLShortener) *URLShortenerServer {
-	return &URLShortenerServer{
+	server := &URLShortenerServer{
 		store:     store,
 		shortener: shortener,
 	}
+
+	router := http.NewServeMux()
+	router.Handle(ShortenRoute, http.HandlerFunc(server.shortenHandler))
+	router.Handle(ExpandRoute, http.HandlerFunc(server.expandHandler))
+
+	server.Handler = router
+
+	return server
+
 }
 
-func (u *URLShortenerServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost:
-		u.processShortURL(w, r)
-	case http.MethodGet:
-		u.showExpandedURL(w, r)
-	}
+func (u *URLShortenerServer) shortenHandler(w http.ResponseWriter, r *http.Request) {
+	u.processShortURL(w, r)
+}
+
+func (u *URLShortenerServer) expandHandler(w http.ResponseWriter, r *http.Request) {
+	u.showExpandedURL(w, r)
 }
 
 func (u *URLShortenerServer) showExpandedURL(w http.ResponseWriter, r *http.Request) {
