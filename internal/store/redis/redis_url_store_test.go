@@ -73,9 +73,19 @@ func TestRedisURLStoreImplementation(t *testing.T) {
 	defer client.Close()
 	defer cancel()
 
-	urlStore := RedisURLStore{client: client}
+	config := &redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       9, // use only DB 9 for tests
+	}
 
-	err := urlStore.Save(shortLink, baseURL)
+	urlStore, err := NewRedisURLStore(config)
+
+	if err != nil {
+		t.Errorf("error creating client for url redis store, %v", err)
+	}
+
+	err = urlStore.Save(shortLink, baseURL)
 
 	if err != nil {
 		t.Fatalf("Save method error, %v", err)
