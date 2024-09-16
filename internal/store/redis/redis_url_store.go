@@ -29,6 +29,14 @@ func NewRedisURLStore(config *redis.Options) (*RedisURLStore, error) {
 	return &RedisURLStore{client: client}, nil
 }
 
+func NewRedisConfig(addr, password string, db int) *redis.Options {
+	return &redis.Options{
+		Addr:     addr,
+		Password: password,
+		DB:       db,
+	}
+}
+
 func validateRedisConfig(client redis.Client) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

@@ -104,7 +104,7 @@ func TestRedisURLStoreImplementation(t *testing.T) {
 }
 
 func TestRedisStoreConfig(t *testing.T) {
-	t.Run("create redis store with custom config", func(t *testing.T) {
+	t.Run("create redis store with pre set config", func(t *testing.T) {
 		config := &redis.Options{
 			Addr:     "localhost:6379",
 			Password: "",
@@ -120,5 +120,12 @@ func TestRedisStoreConfig(t *testing.T) {
 		_, err := NewRedisURLStore(nil)
 
 		testutil.AssertError(t, err)
+	})
+
+	t.Run("with new custom config", func(t *testing.T) {
+		config := NewRedisConfig("localhost:6379", "", 9)
+
+		_, err := NewRedisURLStore(config)
+		testutil.AssertNoError(t, err)
 	})
 }
