@@ -70,17 +70,18 @@ func TestSavingAndRetrievingFromRedis(t *testing.T) {
 	defer client.Close()
 
 	defer cancel()
+	client.FlushAll(ctx)
 
 	pingRedis(t, ctx, client)
 	storeString(t, ctx, client, shortSuffix, baseURL)
 	retrieveString(t, ctx, client, shortSuffix, baseURL)
-	client.FlushAll(ctx)
 }
 
 func TestRedisURLStoreImplementation(t *testing.T) {
 	client, ctx, cancel := setupClient()
 	defer cancel()
 	defer client.Close()
+	client.FlushAll(ctx)
 
 	urlStore := RedisURLStore{client: client}
 

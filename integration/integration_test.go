@@ -54,4 +54,8 @@ func TestRecordingBaseURLsAndRetrievingThem(t *testing.T) {
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
 		testutil.AssertResponseBody(t, response.Body.String(), baseURL)
 	}
+
+	response := httptest.NewRecorder()
+	shortenerServer.ServeHTTP(response, testutil.NewPostShortURLRequest(""))
+	testutil.AssertStatus(t, response.Code, http.StatusInternalServerError)
 }
