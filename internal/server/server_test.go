@@ -17,10 +17,11 @@ type StubURLStore struct {
 	mu            sync.Mutex
 }
 
-func (s *StubURLStore) Save(baseURL, shortLink string) {
+func (s *StubURLStore) Save(baseURL, shortLink string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.shortURLCalls = append(s.shortURLCalls, baseURL)
+	return nil
 }
 
 func (s *StubURLStore) Load(shortLink string) (string, bool) {

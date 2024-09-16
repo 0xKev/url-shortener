@@ -8,8 +8,9 @@ import (
 	"github.com/0xKev/url-shortener/internal/base62"
 	"github.com/0xKev/url-shortener/internal/server"
 	"github.com/0xKev/url-shortener/internal/shortener"
-	memory_store "github.com/0xKev/url-shortener/internal/store/memory"
+	redis_store "github.com/0xKev/url-shortener/internal/store/redis"
 	"github.com/0xKev/url-shortener/internal/testutil"
+	"github.com/redis/go-redis/v9"
 )
 
 type EncodeFunc func(num uint64) string
@@ -24,7 +25,15 @@ func TestRecordingBaseURLsAndRetrievingThem(t *testing.T) {
 	shortenerConfig := shortener.NewDefaultConfig()
 
 	urlShortener := shortener.NewURLShortener(shortenerConfig, encoder)
-	store := memory_store.NewInMemoryURLStore()
+	storeConfig := &redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       9, // use only DB 9 for tests
+	}
+	store, err := redis_store.NewRedisURLStore(storeConfig)
+	if err != nil {
+		t.Fatalf("error when creating redis store %v", err)
+	}
 	shortenerServer := server.NewURLShortenerServer(store, urlShortener)
 
 	baseURLs := []string{"google.com", "github.com", "youtube.com"}

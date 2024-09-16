@@ -9,7 +9,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const shortLink = "s.shorten.com/000000"
+const shortSuffix = "000000"
 const baseURL = "google.com"
 
 func pingRedis(t testing.TB, ctx context.Context, client *redis.Client) {
@@ -20,19 +20,19 @@ func pingRedis(t testing.TB, ctx context.Context, client *redis.Client) {
 	}
 }
 
-func storeString(t testing.TB, ctx context.Context, client *redis.Client, shortLink, baseURL string) {
+func storeString(t testing.TB, ctx context.Context, client *redis.Client, shortSuffix, baseURL string) {
 	t.Helper()
 
-	err := client.Set(ctx, shortLink, baseURL, 0).Err()
+	err := client.Set(ctx, shortSuffix, baseURL, 0).Err()
 	if err != nil {
 		t.Fatalf("unable to store mapping in redis, %v", err)
 	}
 }
 
-func retrieveString(t testing.TB, ctx context.Context, client *redis.Client, shortLink, baseURL string) {
+func retrieveString(t testing.TB, ctx context.Context, client *redis.Client, shortSuffix, baseURL string) {
 	t.Helper()
 
-	val, err := client.Get(ctx, shortLink).Result()
+	val, err := client.Get(ctx, shortSuffix).Result()
 
 	if err != nil {
 		t.Fatalf("unable to retrieve short link from redis, %v", err)
@@ -72,8 +72,8 @@ func TestSavingAndRetrievingFromRedis(t *testing.T) {
 	defer cancel()
 
 	pingRedis(t, ctx, client)
-	storeString(t, ctx, client, shortLink, baseURL)
-	retrieveString(t, ctx, client, shortLink, baseURL)
+	storeString(t, ctx, client, shortSuffix, baseURL)
+	retrieveString(t, ctx, client, shortSuffix, baseURL)
 	client.FlushAll(ctx)
 }
 
@@ -84,17 +84,17 @@ func TestRedisURLStoreImplementation(t *testing.T) {
 
 	urlStore := RedisURLStore{client: client}
 
-	err := urlStore.Save(shortLink, baseURL)
+	err := urlStore.Save(shortSuffix, baseURL)
 
 	if err != nil {
 		t.Fatalf("Save method error, %v", err)
 	}
-	retrieveString(t, ctx, urlStore.client, shortLink, baseURL)
+	retrieveString(t, ctx, urlStore.client, shortSuffix, baseURL)
 
-	val, found := urlStore.Load(shortLink)
+	val, found := urlStore.Load(shortSuffix)
 
 	if !found {
-		t.Errorf("unable to find baseURL for shortLink %v", shortLink)
+		t.Errorf("unable to find baseURL for shortSuffix %v", shortSuffix)
 	}
 
 	if val != baseURL {

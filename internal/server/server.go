@@ -58,6 +58,6 @@ func (u *URLShortenerServer) processShortURL(w http.ResponseWriter, r *http.Requ
 }
 
 type URLStore interface {
-	Save(shortLink, baseURL string)
+	Save(shortLink, baseURL string) error
 	Load(shortLink string) (string, bool)
 }
