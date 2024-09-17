@@ -55,10 +55,10 @@ func (u *URLShortenerServer) expandHandler(w http.ResponseWriter, r *http.Reques
 func (u *URLShortenerServer) showExpandedURL(w http.ResponseWriter, r *http.Request) {
 	shortLink := strings.TrimPrefix(r.URL.Path, ExpandRoute)
 	expandedURL, found := u.store.Load(shortLink)
+	w.Header().Set("content-type", JsonContentType)
 	if !found {
 		w.WriteHeader(http.StatusNotFound)
 	}
-	w.Header().Set("content-type", JsonContentType)
 	json.NewEncoder(w).Encode(u.getURLPair(shortLink, expandedURL))
 	fmt.Fprint(w, expandedURL)
 }
@@ -74,9 +74,12 @@ func (u *URLShortenerServer) processShortURL(w http.ResponseWriter, r *http.Requ
 		http.Error(w, fmt.Sprintf("Could not shorten URL: %v", err), http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("content-type", JsonContentType)
 	w.WriteHeader(http.StatusOK)
-	u.store.Save(shortURL, baseURL)
+	response := u.getURLPair(shortURL, baseURL)
+	json.NewEncoder(w).Encode(response)
 	fmt.Fprint(w, shortURL)
+	u.store.Save(shortURL, baseURL)
 }
 
 type URLStore interface {

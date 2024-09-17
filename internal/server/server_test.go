@@ -131,6 +131,10 @@ func TestCreateShortURL(t *testing.T) {
 		shortenerServer.ServeHTTP(response, request)
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
 
+		urlPair := getURLPairFromResponse(t, response.Body)
+		assertContentType(t, response, server.JsonContentType)
+		assertURLPairs(t, urlPair, server.URLPair{expectedShortSuffix, baseUrl})
+
 		if len(store.shortURLCalls) != 1 {
 			t.Fatalf("got %d calls to shortURLCalls want %d", len(store.shortURLCalls), 1)
 		}
@@ -194,7 +198,18 @@ func TestConcurrentCreateShortURL(t *testing.T) {
 	createCount := 1000
 	var wg sync.WaitGroup
 	wg.Add(createCount)
-	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
+	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
+		ShortenBaseURLFunc: func(baseURL string) (string, error) {
+			switch baseURL {
+			case "google.com":
+				return googleShortSuffix, nil
+			case "github.com":
+				return githubShortSuffix, nil
+			default:
+				return "", nil
+			}
+		},
+	})
 
 	for i := 0; i < createCount; i++ {
 		go func() {
@@ -204,6 +219,9 @@ func TestConcurrentCreateShortURL(t *testing.T) {
 			shortenerServer.ServeHTTP(response, request)
 
 			testutil.AssertStatus(t, response.Code, http.StatusOK)
+			gotPair := getURLPairFromResponse(t, response.Body)
+			assertContentType(t, response, server.JsonContentType)
+			assertURLPairs(t, gotPair, server.URLPair{googleShortSuffix, store.urlMap[googleShortSuffix]})
 		}()
 	}
 	wg.Wait()
@@ -220,7 +238,18 @@ func TestConcurrentCreateAndGetShortURL(t *testing.T) {
 		},
 	}
 
-	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
+	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
+		ShortenBaseURLFunc: func(baseURL string) (string, error) {
+			switch baseURL {
+			case "google.com":
+				return googleShortSuffix, nil
+			case "github.com":
+				return githubShortSuffix, nil
+			default:
+				return "", nil
+			}
+		},
+	})
 
 	requestCount := 1000
 	createCount := 2000
@@ -234,6 +263,9 @@ func TestConcurrentCreateAndGetShortURL(t *testing.T) {
 			response := httptest.NewRecorder()
 			request := testutil.NewGetExpandedURLRequest(googleShortSuffix)
 			shortenerServer.ServeHTTP(response, request)
+			urlPair := getURLPairFromResponse(t, response.Body)
+			assertContentType(t, response, server.JsonContentType)
+			assertURLPairs(t, urlPair, server.URLPair{googleShortSuffix, store.urlMap[googleShortSuffix]})
 
 			testutil.AssertStatus(t, response.Code, http.StatusOK)
 		}()
@@ -245,6 +277,9 @@ func TestConcurrentCreateAndGetShortURL(t *testing.T) {
 			response := httptest.NewRecorder()
 			request := testutil.NewPostShortURLRequest(store.urlMap[githubShortSuffix])
 			shortenerServer.ServeHTTP(response, request)
+			urlPair := getURLPairFromResponse(t, response.Body)
+			assertContentType(t, response, server.JsonContentType)
+			assertURLPairs(t, urlPair, server.URLPair{githubShortSuffix, store.urlMap[githubShortSuffix]})
 
 			testutil.AssertStatus(t, response.Code, http.StatusOK)
 		}()
@@ -288,7 +323,18 @@ func TestJSONFunctionality(t *testing.T) {
 			githubShortSuffix: "github.com",
 		},
 	}
-	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
+	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
+		ShortenBaseURLFunc: func(baseURL string) (string, error) {
+			switch baseURL {
+			case "google.com":
+				return googleShortSuffix, nil
+			case "github.com":
+				return githubShortSuffix, nil
+			default:
+				return "", nil
+			}
+		},
+	})
 
 	t.Run("returns status 200 on valid GET request", func(t *testing.T) {
 		response := httptest.NewRecorder()
@@ -316,6 +362,27 @@ func TestJSONFunctionality(t *testing.T) {
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
 		assertURLPairs(t, got, wantedPair)
 	})
+
+	t.Run("returns status 200 on valid POST request", func(t *testing.T) {
+		response := httptest.NewRecorder()
+		request := testutil.NewPostShortURLRequest(store.urlMap[googleShortSuffix])
+
+		shortenerServer.ServeHTTP(response, request)
+		testutil.AssertStatus(t, response.Code, http.StatusOK)
+	})
+
+	t.Run("returns valid POST request as JSON", func(t *testing.T) {
+		response := httptest.NewRecorder()
+		request := testutil.NewPostShortURLRequest(store.urlMap[googleShortSuffix])
+
+		shortenerServer.ServeHTTP(response, request)
+
+		got := getURLPairFromResponse(t, response.Body)
+
+		assertContentType(t, response, server.JsonContentType)
+		assertURLPairs(t, got, server.URLPair{googleShortSuffix, store.urlMap[googleShortSuffix]})
+	})
+
 }
 
 func getURLPairFromResponse(t testing.TB, body io.Reader) server.URLPair {
