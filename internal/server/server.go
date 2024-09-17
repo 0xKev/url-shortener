@@ -1,18 +1,25 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 )
 
 const (
-	ExpandRoute  = "/expand/"
-	ShortenRoute = "/shorten/"
+	ExpandRoute     = "/expand/"
+	ShortenRoute    = "/shorten/"
+	JsonContentType = "application/json"
 )
 
 type URLShortener interface {
 	ShortenURL(baseURL string) (string, error)
+}
+
+type URLPair struct {
+	ShortURL string
+	BaseURL  string
 }
 
 type URLShortenerServer struct {
@@ -51,7 +58,13 @@ func (u *URLShortenerServer) showExpandedURL(w http.ResponseWriter, r *http.Requ
 	if !found {
 		w.WriteHeader(http.StatusNotFound)
 	}
+	w.Header().Set("content-type", JsonContentType)
+	json.NewEncoder(w).Encode(u.getURLPair(shortLink, expandedURL))
 	fmt.Fprint(w, expandedURL)
+}
+
+func (u *URLShortenerServer) getURLPair(shortURL, baseURL string) URLPair {
+	return URLPair{ShortURL: shortURL, BaseURL: baseURL}
 }
 
 func (u *URLShortenerServer) processShortURL(w http.ResponseWriter, r *http.Request) {

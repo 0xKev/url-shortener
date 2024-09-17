@@ -1,9 +1,12 @@
 package server_test
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"sync"
 	"testing"
 
@@ -15,6 +18,7 @@ type StubURLStore struct {
 	urlMap        map[string]string
 	shortURLCalls []string
 	getURLCalls   []string
+	urlPair       []server.URLPair
 	mu            sync.Mutex
 }
 
@@ -55,6 +59,10 @@ func TestGETExpandShortURL(t *testing.T) {
 			googleShortSuffix: "google.com",
 			githubShortSuffix: "github.com",
 		},
+		urlPair: []server.URLPair{
+			{googleShortSuffix, "google.com"},
+			{githubShortSuffix, "github.com"},
+		},
 	}
 
 	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
@@ -65,15 +73,21 @@ func TestGETExpandShortURL(t *testing.T) {
 		expectedCalls := 2
 
 		shortenerServer.ServeHTTP(getGoogleResponse, getGoogleReq)
+		googlePair := getURLPairFromResponse(t, getGoogleResponse.Body)
+
 		testutil.AssertStatus(t, getGoogleResponse.Code, http.StatusOK)
-		testutil.AssertResponseBody(t, getGoogleResponse.Body.String(), store.urlMap[googleShortSuffix])
+		assertContentType(t, getGoogleResponse, server.JsonContentType)
+		assertURLPairs(t, googlePair, store.urlPair[0])
 
 		getGithubReq := testutil.NewGetExpandedURLRequest(githubShortSuffix)
 		getGithubResponse := httptest.NewRecorder()
 
 		shortenerServer.ServeHTTP(getGithubResponse, getGithubReq)
+		githubPair := getURLPairFromResponse(t, getGithubResponse.Body)
+
 		testutil.AssertStatus(t, getGithubResponse.Code, http.StatusOK)
-		testutil.AssertResponseBody(t, getGithubResponse.Body.String(), store.urlMap[githubShortSuffix])
+		assertContentType(t, getGithubResponse, server.JsonContentType)
+		assertURLPairs(t, githubPair, store.urlPair[1])
 
 		if len(store.getURLCalls) != expectedCalls {
 			t.Errorf("expected %d calls to get base url but got %d calls", expectedCalls, len(store.getURLCalls))
@@ -97,6 +111,7 @@ func TestCreateShortURL(t *testing.T) {
 		map[string]string{},
 		nil,
 		nil,
+		[]server.URLPair{},
 		sync.Mutex{},
 	}
 	var expectedShortSuffix = "0000001"
@@ -155,8 +170,10 @@ func TestConcurrentGETExpandShortURL(t *testing.T) {
 			response := httptest.NewRecorder()
 			request := testutil.NewGetExpandedURLRequest(googleShortSuffix)
 			shortenerServer.ServeHTTP(response, request)
+			gotPair := getURLPairFromResponse(t, response.Body)
 			testutil.AssertStatus(t, response.Code, http.StatusOK)
-			testutil.AssertResponseBody(t, response.Body.String(), store.urlMap[googleShortSuffix])
+			assertContentType(t, response, server.JsonContentType)
+			assertURLPairs(t, gotPair, server.URLPair{googleShortSuffix, "google.com"})
 		}()
 	}
 	wg.Wait()
@@ -262,5 +279,69 @@ func TestInvalidRequestsRoute(t *testing.T) {
 
 		testutil.AssertStatus(t, response.Code, http.StatusNotFound)
 	})
+}
 
+func TestJSONFunctionality(t *testing.T) {
+	store := StubURLStore{
+		urlMap: map[string]string{
+			googleShortSuffix: "google.com",
+			githubShortSuffix: "github.com",
+		},
+	}
+	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
+
+	t.Run("returns status 200 on valid GET request", func(t *testing.T) {
+		response := httptest.NewRecorder()
+		request := testutil.NewGetExpandedURLRequest(googleShortSuffix)
+
+		shortenerServer.ServeHTTP(response, request)
+
+		getURLPairFromResponse(t, response.Body)
+
+		testutil.AssertStatus(t, response.Code, http.StatusOK)
+	})
+
+	t.Run("returns valid GET request as JSON", func(t *testing.T) {
+		wantedPair := server.URLPair{
+			googleShortSuffix, "google.com",
+		}
+
+		request := testutil.NewGetExpandedURLRequest(googleShortSuffix)
+		response := httptest.NewRecorder()
+
+		shortenerServer.ServeHTTP(response, request)
+		assertContentType(t, response, server.JsonContentType)
+
+		got := getURLPairFromResponse(t, response.Body)
+		testutil.AssertStatus(t, response.Code, http.StatusOK)
+		assertURLPairs(t, got, wantedPair)
+	})
+}
+
+func getURLPairFromResponse(t testing.TB, body io.Reader) server.URLPair {
+	t.Helper()
+
+	got := server.URLPair{}
+
+	err := json.NewDecoder(body).Decode(&got)
+
+	if err != nil {
+		t.Fatalf("Unable to parse response from server %q into slice of URLPair, '%v'", body, err)
+	}
+	return got
+}
+
+func assertURLPairs(t testing.TB, got, want server.URLPair) {
+	t.Helper()
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v want %v", got, want)
+	}
+}
+
+func assertContentType(t testing.TB, response *httptest.ResponseRecorder, want string) {
+	t.Helper()
+
+	if response.Result().Header.Get("content-type") != want {
+		t.Errorf("response did not have content-type of %s, got %v", want, response.Result().Header)
+	}
 }
