@@ -129,7 +129,7 @@ func TestCreateShortURL(t *testing.T) {
 		response := httptest.NewRecorder()
 		request := testutil.NewPostShortURLRequest(baseUrl)
 		shortenerServer.ServeHTTP(response, request)
-		testutil.AssertStatus(t, response.Code, http.StatusAccepted)
+		testutil.AssertStatus(t, response.Code, http.StatusOK)
 
 		if len(store.shortURLCalls) != 1 {
 			t.Fatalf("got %d calls to shortURLCalls want %d", len(store.shortURLCalls), 1)
@@ -203,7 +203,7 @@ func TestConcurrentCreateShortURL(t *testing.T) {
 			request := testutil.NewPostShortURLRequest(store.urlMap[googleShortSuffix])
 			shortenerServer.ServeHTTP(response, request)
 
-			testutil.AssertStatus(t, response.Code, http.StatusAccepted)
+			testutil.AssertStatus(t, response.Code, http.StatusOK)
 		}()
 	}
 	wg.Wait()
@@ -246,7 +246,7 @@ func TestConcurrentCreateAndGetShortURL(t *testing.T) {
 			request := testutil.NewPostShortURLRequest(store.urlMap[githubShortSuffix])
 			shortenerServer.ServeHTTP(response, request)
 
-			testutil.AssertStatus(t, response.Code, http.StatusAccepted)
+			testutil.AssertStatus(t, response.Code, http.StatusOK)
 		}()
 	}
 	wg.Wait()

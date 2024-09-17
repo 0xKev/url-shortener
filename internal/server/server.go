@@ -74,7 +74,7 @@ func (u *URLShortenerServer) processShortURL(w http.ResponseWriter, r *http.Requ
 		http.Error(w, fmt.Sprintf("Could not shorten URL: %v", err), http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusAccepted)
+	w.WriteHeader(http.StatusOK)
 	u.store.Save(shortURL, baseURL)
 	fmt.Fprint(w, shortURL)
 }
