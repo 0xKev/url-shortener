@@ -58,6 +58,7 @@ func (u *URLShortenerServer) showExpandedURL(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("content-type", JsonContentType)
 	if !found {
 		w.WriteHeader(http.StatusNotFound)
+		return
 	}
 	json.NewEncoder(w).Encode(u.getURLPair(shortLink, expandedURL))
 	fmt.Fprint(w, expandedURL)

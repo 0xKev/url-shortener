@@ -1,17 +1,21 @@
 package testutil
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"testing"
+
+	"github.com/0xKev/url-shortener/internal/server"
 )
 
 func NewGetExpandedURLRequest(shortSuffix string) *http.Request {
-	request, _ := http.NewRequest(http.MethodGet, "/expand/"+shortSuffix, nil)
+	request, _ := http.NewRequest(http.MethodGet, server.ExpandRoute+shortSuffix, nil)
 	return request
 }
 
 func NewPostShortURLRequest(baseURL string) *http.Request {
-	request, _ := http.NewRequest(http.MethodPost, "/shorten/"+baseURL, nil)
+	request, _ := http.NewRequest(http.MethodPost, server.ShortenRoute+baseURL, nil)
 	return request
 }
 
@@ -41,4 +45,17 @@ func AssertError(t testing.TB, err error) {
 	if err == nil {
 		t.Error("expected an error but got none")
 	}
+}
+
+func GetURLPairFromResponse(t testing.TB, body io.Reader) server.URLPair {
+	t.Helper()
+
+	got := server.URLPair{}
+
+	err := json.NewDecoder(body).Decode(&got)
+
+	if err != nil {
+		t.Fatalf("Unable to parse response from server %q into slice of URLPair, '%v'", body, err)
+	}
+	return got
 }
