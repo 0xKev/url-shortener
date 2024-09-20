@@ -18,8 +18,8 @@ type URLShortener interface {
 }
 
 type URLPair struct {
-	ShortURL string
-	BaseURL  string
+	ShortSuffix string
+	BaseURL     string
 }
 
 type URLShortenerServer struct {
@@ -65,7 +65,7 @@ func (u *URLShortenerServer) showExpandedURL(w http.ResponseWriter, r *http.Requ
 }
 
 func (u *URLShortenerServer) getURLPair(shortURL, baseURL string) URLPair {
-	return URLPair{ShortURL: shortURL, BaseURL: baseURL}
+	return URLPair{ShortSuffix: shortURL, BaseURL: baseURL}
 }
 
 func (u *URLShortenerServer) processShortURL(w http.ResponseWriter, r *http.Request) {
