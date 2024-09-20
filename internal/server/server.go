@@ -61,7 +61,6 @@ func (u *URLShortenerServer) showExpandedURL(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	json.NewEncoder(w).Encode(u.getURLPair(shortLink, expandedURL))
-	fmt.Fprint(w, expandedURL)
 }
 
 func (u *URLShortenerServer) getURLPair(shortURL, baseURL string) URLPair {
@@ -79,7 +78,6 @@ func (u *URLShortenerServer) processShortURL(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusOK)
 	response := u.getURLPair(shortURL, baseURL)
 	json.NewEncoder(w).Encode(response)
-	fmt.Fprint(w, shortURL)
 	u.store.Save(shortURL, baseURL)
 }
 
