@@ -3,6 +3,7 @@ package integration
 import (
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"github.com/0xKev/url-shortener/internal/base62"
@@ -39,25 +40,32 @@ func TestRecordingBaseURLsAndRetrievingThem(t *testing.T) {
 	shortenerServer := server.NewURLShortenerServer(store, urlShortener)
 
 	baseURLs := []string{"google.com", "github.com", "youtube.com"}
-	shortLinks := make(map[string]string)
+	expectedPairs := []server.URLPair{}
 
 	// Create short URLs
 	for _, baseURL := range baseURLs {
 		response := httptest.NewRecorder()
 		shortenerServer.ServeHTTP(response, testutil.NewPostShortURLRequest(baseURL))
-		testutil.AssertStatus(t, response.Code, http.StatusAccepted)
-		shortLinks[baseURL] = response.Body.String()
+		testutil.AssertStatus(t, response.Code, http.StatusOK)
+		gotPair := testutil.GetURLPairFromResponse(t, response.Body)
+		expectedPairs = append(expectedPairs, gotPair)
 	}
 
 	// Fetch base URLs from short URLs
-	for baseURL, shortSuffix := range shortLinks {
+	gotPairs := []server.URLPair{}
+	for _, urlPair := range expectedPairs {
 		response := httptest.NewRecorder()
-		shortenerServer.ServeHTTP(response, testutil.NewGetExpandedURLRequest(shortSuffix))
+		request := testutil.NewGetExpandedURLRequest(urlPair.ShortSuffix)
+		shortenerServer.ServeHTTP(response, request)
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
-		testutil.AssertResponseBody(t, response.Body.String(), baseURL)
+		gotPairs = append(gotPairs, testutil.GetURLPairFromResponse(t, response.Body))
+	}
+
+	if !reflect.DeepEqual(expectedPairs, gotPairs) {
+		t.Fatalf("getting base url after creating short url does not return the same url")
 	}
 
 	response := httptest.NewRecorder()
 	shortenerServer.ServeHTTP(response, testutil.NewPostShortURLRequest(""))
-	testutil.AssertStatus(t, response.Code, http.StatusInternalServerError)
+	testutil.AssertStatus(t, response.Code, http.StatusInternalServerError) // change to status 404 instead of 500
 }
