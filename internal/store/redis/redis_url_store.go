@@ -8,12 +8,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// gotta implement these types
-// type URLStore interface {
-// 	Save(shortLink, baseURL string)
-// 	Load(shortLink string) (string, bool)
-// }
-
 type RedisURLStore struct {
 	client *redis.Client
 }
