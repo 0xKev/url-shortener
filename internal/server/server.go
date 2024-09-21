@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -65,7 +66,15 @@ func (u *URLShortenerServer) getURLPair(shortURL, baseURL string) model.URLPair 
 }
 
 func (u *URLShortenerServer) processShortURL(w http.ResponseWriter, r *http.Request) {
-	baseURL := strings.TrimPrefix(r.URL.Path, ShortenRoute)
+	defer r.Body.Close()
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Could not shorten URL: %v", err), http.StatusInternalServerError)
+		return
+	}
+	baseURL := string(body)
+
+	// baseURL := strings.TrimPrefix(r.URL.Path, ShortenRoute)
 	shortURL, err := u.shortener.ShortenURL(baseURL)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Could not shorten URL: %v", err), http.StatusInternalServerError)

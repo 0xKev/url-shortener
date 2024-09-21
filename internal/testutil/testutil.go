@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/0xKev/url-shortener/internal/model"
@@ -16,7 +17,8 @@ func NewGetExpandedURLRequest(shortSuffix string) *http.Request {
 }
 
 func NewPostShortURLRequest(baseURL string) *http.Request {
-	request, _ := http.NewRequest(http.MethodPost, server.ShortenRoute+baseURL, nil)
+	body := strings.NewReader(baseURL)
+	request, _ := http.NewRequest(http.MethodPost, server.ShortenRoute, body)
 	return request
 }
 
