@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/0xKev/url-shortener/internal/model"
 )
 
 const (
@@ -15,11 +17,6 @@ const (
 
 type URLShortener interface {
 	ShortenURL(baseURL string) (string, error)
-}
-
-type URLPair struct {
-	ShortSuffix string
-	BaseURL     string
 }
 
 type URLShortenerServer struct {
@@ -63,8 +60,8 @@ func (u *URLShortenerServer) showExpandedURL(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(u.getURLPair(shortLink, expandedURL))
 }
 
-func (u *URLShortenerServer) getURLPair(shortURL, baseURL string) URLPair {
-	return URLPair{ShortSuffix: shortURL, BaseURL: baseURL}
+func (u *URLShortenerServer) getURLPair(shortURL, baseURL string) model.URLPair {
+	return model.URLPair{ShortSuffix: shortURL, BaseURL: baseURL}
 }
 
 func (u *URLShortenerServer) processShortURL(w http.ResponseWriter, r *http.Request) {

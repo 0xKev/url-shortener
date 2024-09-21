@@ -8,6 +8,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/0xKev/url-shortener/internal/model"
 	server "github.com/0xKev/url-shortener/internal/server"
 	testutil "github.com/0xKev/url-shortener/internal/testutil"
 )
@@ -16,7 +17,7 @@ type StubURLStore struct {
 	urlMap        map[string]string
 	shortURLCalls []string
 	getURLCalls   []string
-	urlPair       []server.URLPair
+	urlPair       []model.URLPair
 	mu            sync.Mutex
 }
 
@@ -57,9 +58,9 @@ func TestGETExpandShortURL(t *testing.T) {
 			googleShortSuffix: "google.com",
 			githubShortSuffix: "github.com",
 		},
-		urlPair: []server.URLPair{
-			{googleShortSuffix, "google.com"},
-			{githubShortSuffix, "github.com"},
+		urlPair: []model.URLPair{
+			{ShortSuffix: googleShortSuffix, BaseURL: "google.com"},
+			{ShortSuffix: githubShortSuffix, BaseURL: "github.com"},
 		},
 	}
 
@@ -109,7 +110,7 @@ func TestCreateShortURL(t *testing.T) {
 		map[string]string{},
 		nil,
 		nil,
-		[]server.URLPair{},
+		[]model.URLPair{},
 		sync.Mutex{},
 	}
 	var expectedShortSuffix = "0000001"
@@ -131,7 +132,7 @@ func TestCreateShortURL(t *testing.T) {
 
 		urlPair := testutil.GetURLPairFromResponse(t, response.Body)
 		assertContentType(t, response, server.JsonContentType)
-		assertURLPairs(t, urlPair, server.URLPair{expectedShortSuffix, baseUrl})
+		assertURLPairs(t, urlPair, model.URLPair{ShortSuffix: expectedShortSuffix, BaseURL: baseUrl})
 
 		if len(store.shortURLCalls) != 1 {
 			t.Fatalf("got %d calls to shortURLCalls want %d", len(store.shortURLCalls), 1)
@@ -175,7 +176,7 @@ func TestConcurrentGETExpandShortURL(t *testing.T) {
 			gotPair := testutil.GetURLPairFromResponse(t, response.Body)
 			testutil.AssertStatus(t, response.Code, http.StatusOK)
 			assertContentType(t, response, server.JsonContentType)
-			assertURLPairs(t, gotPair, server.URLPair{googleShortSuffix, "google.com"})
+			assertURLPairs(t, gotPair, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: "google.com"})
 		}()
 	}
 	wg.Wait()
@@ -219,7 +220,7 @@ func TestConcurrentCreateShortURL(t *testing.T) {
 			testutil.AssertStatus(t, response.Code, http.StatusOK)
 			gotPair := testutil.GetURLPairFromResponse(t, response.Body)
 			assertContentType(t, response, server.JsonContentType)
-			assertURLPairs(t, gotPair, server.URLPair{googleShortSuffix, store.urlMap[googleShortSuffix]})
+			assertURLPairs(t, gotPair, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: store.urlMap[googleShortSuffix]})
 		}()
 	}
 	wg.Wait()
@@ -263,7 +264,7 @@ func TestConcurrentCreateAndGetShortURL(t *testing.T) {
 			shortenerServer.ServeHTTP(response, request)
 			urlPair := testutil.GetURLPairFromResponse(t, response.Body)
 			assertContentType(t, response, server.JsonContentType)
-			assertURLPairs(t, urlPair, server.URLPair{googleShortSuffix, store.urlMap[googleShortSuffix]})
+			assertURLPairs(t, urlPair, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: store.urlMap[googleShortSuffix]})
 
 			testutil.AssertStatus(t, response.Code, http.StatusOK)
 		}()
@@ -277,7 +278,7 @@ func TestConcurrentCreateAndGetShortURL(t *testing.T) {
 			shortenerServer.ServeHTTP(response, request)
 			urlPair := testutil.GetURLPairFromResponse(t, response.Body)
 			assertContentType(t, response, server.JsonContentType)
-			assertURLPairs(t, urlPair, server.URLPair{githubShortSuffix, store.urlMap[githubShortSuffix]})
+			assertURLPairs(t, urlPair, model.URLPair{ShortSuffix: githubShortSuffix, BaseURL: store.urlMap[githubShortSuffix]})
 
 			testutil.AssertStatus(t, response.Code, http.StatusOK)
 		}()
@@ -346,8 +347,8 @@ func TestJSONFunctionality(t *testing.T) {
 	})
 
 	t.Run("returns valid GET request as JSON", func(t *testing.T) {
-		wantedPair := server.URLPair{
-			googleShortSuffix, "google.com",
+		wantedPair := model.URLPair{
+			ShortSuffix: googleShortSuffix, BaseURL: "google.com",
 		}
 
 		request := testutil.NewGetExpandedURLRequest(googleShortSuffix)
@@ -378,12 +379,12 @@ func TestJSONFunctionality(t *testing.T) {
 		got := testutil.GetURLPairFromResponse(t, response.Body)
 
 		assertContentType(t, response, server.JsonContentType)
-		assertURLPairs(t, got, server.URLPair{googleShortSuffix, store.urlMap[googleShortSuffix]})
+		assertURLPairs(t, got, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: store.urlMap[googleShortSuffix]})
 	})
 
 }
 
-func assertURLPairs(t testing.TB, got, want server.URLPair) {
+func assertURLPairs(t testing.TB, got, want model.URLPair) {
 	t.Helper()
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v want %v", got, want)

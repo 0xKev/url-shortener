@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/0xKev/url-shortener/internal/model"
 	"github.com/0xKev/url-shortener/internal/server"
 )
 
@@ -47,10 +48,10 @@ func AssertError(t testing.TB, err error) {
 	}
 }
 
-func GetURLPairFromResponse(t testing.TB, body io.Reader) server.URLPair {
+func GetURLPairFromResponse(t testing.TB, body io.Reader) model.URLPair {
 	t.Helper()
 
-	got := server.URLPair{}
+	got := model.URLPair{}
 
 	err := json.NewDecoder(body).Decode(&got)
 
