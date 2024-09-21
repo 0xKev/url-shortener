@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/0xKev/url-shortener/internal/base62"
+	"github.com/0xKev/url-shortener/internal/model"
 	"github.com/0xKev/url-shortener/internal/server"
 	"github.com/0xKev/url-shortener/internal/shortener"
 	redis_store "github.com/0xKev/url-shortener/internal/store/redis"
@@ -40,7 +41,7 @@ func TestRecordingBaseURLsAndRetrievingThem(t *testing.T) {
 	shortenerServer := server.NewURLShortenerServer(store, urlShortener)
 
 	baseURLs := []string{"google.com", "github.com", "youtube.com"}
-	expectedPairs := []server.URLPair{}
+	expectedPairs := []model.URLPair{}
 
 	// Create short URLs
 	for _, baseURL := range baseURLs {
@@ -52,7 +53,7 @@ func TestRecordingBaseURLsAndRetrievingThem(t *testing.T) {
 	}
 
 	// Fetch base URLs from short URLs
-	gotPairs := []server.URLPair{}
+	gotPairs := []model.URLPair{}
 	for _, urlPair := range expectedPairs {
 		response := httptest.NewRecorder()
 		request := testutil.NewGetExpandedURLRequest(urlPair.ShortSuffix)
