@@ -1,0 +1,20 @@
+{{define "base"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://unpkg.com/htmx.org@2.0.2" integrity="sha384-Y7hw+L/jvKeWIRRkqWYfPcvVxHzVzn5REgzbawhxAuQGwX1XWe70vji+VSeHOThJ" crossorigin="anonymous"></script>
+    <link href="../static/css/output.css" rel="stylesheet">
+    <title>URL Shortener</title>
+</head>
+
+<body>
+    <header class="flex justify-center items-center space-x-2 p-8">
+        <p class="">URL Shortener</p>
+        <p class="text-accent-500">Simplify your link instantly.</p>
+    </header>
+{{template "content" .}}
+{{end}}
+</body>
+    
