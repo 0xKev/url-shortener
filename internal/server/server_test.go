@@ -384,6 +384,17 @@ func TestJSONFunctionality(t *testing.T) {
 
 }
 
+func TestIndexPageOKStatus(t *testing.T) {
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	shortenerServer := server.NewURLShortenerServer(&StubURLStore{}, MockURLShortener{})
+
+	shortenerServer.ServeHTTP(response, request)
+
+	testutil.AssertStatus(t, response.Code, http.StatusOK)
+}
+
 func assertURLPairs(t testing.TB, got, want model.URLPair) {
 	t.Helper()
 	if !reflect.DeepEqual(got, want) {

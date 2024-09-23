@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
+	urlrenderer "github.com/0xKev/url-shortener"
 	"github.com/0xKev/url-shortener/internal/model"
 )
 
@@ -23,23 +25,48 @@ type URLShortener interface {
 type URLShortenerServer struct {
 	store     URLStore
 	shortener URLShortener
+	renderer  *urlrenderer.URLPairRenderer
 	http.Handler
 }
 
 func NewURLShortenerServer(store URLStore, shortener URLShortener) *URLShortenerServer {
+	renderer, err := urlrenderer.NewURLPairRenderer()
+
+	if err != nil {
+		panic(err) // panic only temp - handle err later
+	}
+
 	server := &URLShortenerServer{
 		store:     store,
 		shortener: shortener,
+		renderer:  renderer,
 	}
 
 	router := http.NewServeMux()
+	router.HandleFunc("/", server.indexHandler)
 	router.Handle(ShortenRoute, http.HandlerFunc(server.shortenHandler))
 	router.Handle(ExpandRoute, http.HandlerFunc(server.expandHandler))
+
+	log.Printf("Routes registered: /, %s, %s", ShortenRoute, ExpandRoute)
 
 	server.Handler = router
 
 	return server
 
+}
+
+func (u *URLShortenerServer) indexHandler(w http.ResponseWriter, r *http.Request) {
+	if strings.TrimPrefix(r.URL.Path, "/") != "" {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	err := u.renderer.RenderIndex(w)
+
+	if err != nil {
+		panic(err)
+	}
+	log.Println("Index rendered successfully")
 }
 
 func (u *URLShortenerServer) shortenHandler(w http.ResponseWriter, r *http.Request) {
