@@ -4,7 +4,8 @@ module.exports = {
     "./templates/index.html",
     "./templates/*.{html,js}",
     "./templates/index.gohtml",
-    "./templates/*.gohtml"
+    "./templates/*.gohtml",
+    "./templates/dev/*.html"
   ],
   theme: {
     extend: {},
