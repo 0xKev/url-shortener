@@ -13,8 +13,9 @@ import (
 
 const (
 	ExpandRoute     = "/expand/"
-	ShortenRoute    = "/shorten/"
+	ShortenRoute    = "/shorten"
 	JsonContentType = "application/json"
+	HtmxContentType = "application/x-www-form-urlencoded"
 )
 
 type URLShortener interface {
@@ -79,6 +80,13 @@ func (u *URLShortenerServer) expandHandler(w http.ResponseWriter, r *http.Reques
 func (u *URLShortenerServer) showExpandedURL(w http.ResponseWriter, r *http.Request) {
 	shortLink := strings.TrimPrefix(r.URL.Path, ExpandRoute)
 	expandedURL, found := u.store.Load(shortLink)
+	htmxRequest := r.Header.Get("HX-Request")
+
+	if htmxRequest != "" {
+		w.Header().Set("HX-Redirect", expandedURL)
+		return
+	}
+
 	w.Header().Set("content-type", JsonContentType)
 	if !found {
 		w.WriteHeader(http.StatusNotFound)
@@ -100,12 +108,20 @@ func (u *URLShortenerServer) processShortURL(w http.ResponseWriter, r *http.Requ
 		http.Error(w, fmt.Sprintf("Could not shorten URL: %v", err), http.StatusInternalServerError)
 		return
 	}
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("content-type", HtmxContentType)
+		log.Printf("base url: '%v', shorturl: '%v'", baseURL, shortURL)
+		err := u.renderer.Render(w, model.URLPair{BaseURL: baseURL, ShortSuffix: shortURL})
+		if err != nil {
+			panic(err)
+		}
+		return
+	}
 	w.Header().Set("content-type", JsonContentType)
 	w.WriteHeader(http.StatusOK)
 	response := u.getURLPair(shortURL, baseURL)
 	json.NewEncoder(w).Encode(response)
 	u.store.Save(shortURL, baseURL)
-	u.renderer.Render(w, model.URLPair{BaseURL: baseURL, ShortSuffix: shortURL})
 }
 
 type URLStore interface {

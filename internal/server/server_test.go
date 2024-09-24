@@ -4,13 +4,16 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/0xKev/url-shortener/internal/model"
 	server "github.com/0xKev/url-shortener/internal/server"
 	testutil "github.com/0xKev/url-shortener/internal/testutil"
+	approvals "github.com/approvals/go-approval-tests"
 )
 
 type StubURLStore struct {
@@ -341,8 +344,8 @@ func TestJSONFunctionality(t *testing.T) {
 
 		shortenerServer.ServeHTTP(response, request)
 
+		testutil.AssertNoHTMXRedirect(t, *response.Result())
 		testutil.GetURLPairFromResponse(t, response.Body)
-
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
 	})
 
@@ -356,6 +359,7 @@ func TestJSONFunctionality(t *testing.T) {
 
 		shortenerServer.ServeHTTP(response, request)
 		assertContentType(t, response, server.JsonContentType)
+		testutil.AssertNoHTMXRedirect(t, *response.Result())
 
 		got := testutil.GetURLPairFromResponse(t, response.Body)
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
@@ -368,6 +372,7 @@ func TestJSONFunctionality(t *testing.T) {
 
 		shortenerServer.ServeHTTP(response, request)
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
+		assertContentType(t, response, server.JsonContentType)
 	})
 
 	t.Run("returns valid POST request as JSON", func(t *testing.T) {
@@ -393,6 +398,59 @@ func TestIndexPageOKStatus(t *testing.T) {
 	shortenerServer.ServeHTTP(response, request)
 
 	testutil.AssertStatus(t, response.Code, http.StatusOK)
+}
+
+func TestHTMXFunctionality(t *testing.T) {
+	store := StubURLStore{
+		urlMap: map[string]string{
+			googleShortSuffix: "google.com",
+			githubShortSuffix: "github.com",
+		},
+	}
+	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
+		ShortenBaseURLFunc: func(baseURL string) (string, error) {
+			switch baseURL {
+			case "google.com":
+				return googleShortSuffix, nil
+			case "github.com":
+				return githubShortSuffix, nil
+			default:
+				return "", nil
+			}
+		},
+	})
+
+	t.Run("GET /expand/ with HTMX sets HX-Redirect Header", func(t *testing.T) {
+		request := testutil.NewGetExpandedURLRequest(googleShortSuffix)
+		request.Header.Set("HX-Request", "true")
+		response := httptest.NewRecorder()
+
+		shortenerServer.ServeHTTP(response, request)
+		testutil.AssertStatus(t, response.Code, http.StatusOK)
+		testutil.AssertHTMXRedirect(t, *response.Result(), store.urlMap[googleShortSuffix])
+
+		assertContentType(t, response, server.HtmxContentType)
+	})
+
+	t.Run("POST /shorten with HTMX returns HTML partial", func(t *testing.T) {
+		formData := url.Values{}
+		formData.Set("base-url", store.urlMap[googleShortSuffix])
+		body := strings.NewReader(formData.Encode())
+
+		request := httptest.NewRequest(http.MethodPost, server.ShortenRoute, body)
+		request.Header.Set("HX-Request", "true")
+		request.Header.Set("content-type", server.HtmxContentType)
+
+		response := httptest.NewRecorder()
+
+		shortenerServer.ServeHTTP(response, request)
+
+		testutil.AssertStatus(t, response.Code, http.StatusOK)
+
+		approvals.VerifyString(t, response.Body.String())
+		assertContentType(t, response, server.HtmxContentType)
+
+	})
 }
 
 func assertURLPairs(t testing.TB, got, want model.URLPair) {

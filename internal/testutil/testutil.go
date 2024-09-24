@@ -26,6 +26,12 @@ func NewPostShortURLRequest(baseURL string) *http.Request {
 	return request
 }
 
+func AssertHTMXRedirect(t testing.TB, got http.Response, want string) {
+	if got.Header.Get("HX-Redirect") != want {
+		t.Errorf("expected HX-Redirect to '%v' but got '%v'", want, got.Header.Get("HX-Redirect"))
+	}
+}
+
 func AssertResponseBody(t testing.TB, got, want string) {
 	t.Helper()
 
@@ -65,4 +71,12 @@ func GetURLPairFromResponse(t testing.TB, body io.Reader) model.URLPair {
 		t.Fatalf("Unable to parse response from server %q into slice of URLPair, '%v'", body, err)
 	}
 	return got
+}
+
+func AssertNoHTMXRedirect(t testing.TB, response http.Response) {
+	t.Helper()
+
+	if response.Header.Get("HX-Redirect") != "" {
+		t.Fatal("did not expect an HX-Redirect but got one")
+	}
 }
