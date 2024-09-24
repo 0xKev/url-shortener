@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -94,14 +93,8 @@ func (u *URLShortenerServer) getURLPair(shortURL, baseURL string) model.URLPair 
 
 func (u *URLShortenerServer) processShortURL(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Could not shorten URL: %v", err), http.StatusInternalServerError)
-		return
-	}
-	baseURL := string(body)
+	baseURL := r.FormValue("base-url")
 
-	// baseURL := strings.TrimPrefix(r.URL.Path, ShortenRoute)
 	shortURL, err := u.shortener.ShortenURL(baseURL)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Could not shorten URL: %v", err), http.StatusInternalServerError)
@@ -112,6 +105,7 @@ func (u *URLShortenerServer) processShortURL(w http.ResponseWriter, r *http.Requ
 	response := u.getURLPair(shortURL, baseURL)
 	json.NewEncoder(w).Encode(response)
 	u.store.Save(shortURL, baseURL)
+	u.renderer.Render(w, model.URLPair{BaseURL: baseURL, ShortSuffix: shortURL})
 }
 
 type URLStore interface {

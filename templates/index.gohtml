@@ -3,13 +3,13 @@
 {{define "content"}}
 <main class="flex justify-center">
     <div id="shorten-url" class="m-8 shadow-lg border w-full max-w-2xl p-6 rounded-lg">
-        <form hx-post="/shorten" hx-target="body" class="items-center justify-center">
+        <div class="items-center justify-center">
             <div class="flex flex-col">
                 <h3>Shorten link here :)</h3>
                 <input type="url" name="base-url" placeholder="Enter link here" class="border">
             </div>
-            <button type="submit" class="bg-primary rounded-md px-2 py-1 text">Shorten</button>
-        </form>
+            <button type="submit" hx-post="/shorten/" hx-include="[name='base-url']" class="bg-primary rounded-md px-2 py-1 text">Shorten</button>
+        </div>
     </div>
 </main>
 {{end}}

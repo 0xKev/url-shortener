@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -17,8 +18,11 @@ func NewGetExpandedURLRequest(shortSuffix string) *http.Request {
 }
 
 func NewPostShortURLRequest(baseURL string) *http.Request {
-	body := strings.NewReader(baseURL)
+	formData := url.Values{}
+	formData.Set("base-url", baseURL)
+	body := strings.NewReader(formData.Encode())
 	request, _ := http.NewRequest(http.MethodPost, server.ShortenRoute, body)
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	return request
 }
 
