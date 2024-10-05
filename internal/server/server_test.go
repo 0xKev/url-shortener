@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"reflect"
-	"strings"
 	"sync"
 	"testing"
 
@@ -24,17 +22,17 @@ type StubURLStore struct {
 	mu            sync.Mutex
 }
 
-func (s *StubURLStore) Save(baseURL, shortLink string) error {
+func (s *StubURLStore) Save(urlPair model.URLPair) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.shortURLCalls = append(s.shortURLCalls, baseURL)
+	s.shortURLCalls = append(s.shortURLCalls, urlPair.ShortSuffix)
 	return nil
 }
 
-func (s *StubURLStore) Load(shortLink string) (string, bool) {
+func (s *StubURLStore) Load(shortSuffix string) (string, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	baseURL, found := s.urlMap[shortLink]
+	baseURL, found := s.urlMap[shortSuffix]
 	s.getURLCalls = append(s.getURLCalls, baseURL)
 	return baseURL, found
 }
@@ -55,7 +53,7 @@ var githubShortSuffix = "0000002"
 var doesNotExistShortSuffix = "1000000"
 var invalidBaseURL = ""
 
-func TestGETExpandShortURL(t *testing.T) {
+func TestAPIGETExpandShortURL(t *testing.T) {
 	store := StubURLStore{
 		urlMap: map[string]string{
 			googleShortSuffix: "google.com",
@@ -70,7 +68,7 @@ func TestGETExpandShortURL(t *testing.T) {
 	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
 
 	t.Run("returns correct base url via short suffix", func(t *testing.T) {
-		getGoogleReq := testutil.NewGetExpandedURLRequest(googleShortSuffix)
+		getGoogleReq := testutil.NewGetAPIExpandedURLRequest(googleShortSuffix)
 		getGoogleResponse := httptest.NewRecorder()
 		expectedCalls := 2
 
@@ -81,7 +79,7 @@ func TestGETExpandShortURL(t *testing.T) {
 		assertContentType(t, getGoogleResponse, server.JsonContentType)
 		assertURLPairs(t, googlePair, store.urlPair[0])
 
-		getGithubReq := testutil.NewGetExpandedURLRequest(githubShortSuffix)
+		getGithubReq := testutil.NewGetAPIExpandedURLRequest(githubShortSuffix)
 		getGithubResponse := httptest.NewRecorder()
 
 		shortenerServer.ServeHTTP(getGithubResponse, getGithubReq)
@@ -97,7 +95,7 @@ func TestGETExpandShortURL(t *testing.T) {
 	})
 
 	t.Run("returns 404 on missing short links", func(t *testing.T) {
-		request := testutil.NewGetExpandedURLRequest(doesNotExistShortSuffix)
+		request := testutil.NewGetAPIExpandedURLRequest(doesNotExistShortSuffix)
 		response := httptest.NewRecorder()
 
 		shortenerServer.ServeHTTP(response, request)
@@ -108,7 +106,7 @@ func TestGETExpandShortURL(t *testing.T) {
 	})
 }
 
-func TestCreateShortURL(t *testing.T) {
+func TestAPICreateShortURL(t *testing.T) {
 	store := StubURLStore{
 		map[string]string{},
 		nil,
@@ -129,7 +127,7 @@ func TestCreateShortURL(t *testing.T) {
 	t.Run("records google.com on POST request", func(t *testing.T) {
 		baseUrl := "google.com"
 		response := httptest.NewRecorder()
-		request := testutil.NewPostShortURLRequest(baseUrl)
+		request := testutil.NewPostAPIShortenURLRequest(baseUrl)
 		shortenerServer.ServeHTTP(response, request)
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
 
@@ -149,14 +147,14 @@ func TestCreateShortURL(t *testing.T) {
 	t.Run("error on invalid url POST request", func(t *testing.T) {
 		response := httptest.NewRecorder()
 
-		request := testutil.NewPostShortURLRequest(invalidBaseURL)
+		request := testutil.NewPostAPIShortenURLRequest(invalidBaseURL) // MAKE THIS RETURN AN ERROR
 		shortenerServer.ServeHTTP(response, request)
 
 		testutil.AssertStatus(t, response.Code, http.StatusInternalServerError)
 	})
 }
 
-func TestConcurrentGETExpandShortURL(t *testing.T) {
+func TestAPIConcurrentGETExpandShortURL(t *testing.T) {
 	store := StubURLStore{
 		urlMap: map[string]string{
 			googleShortSuffix: "google.com",
@@ -174,7 +172,7 @@ func TestConcurrentGETExpandShortURL(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			response := httptest.NewRecorder()
-			request := testutil.NewGetExpandedURLRequest(googleShortSuffix)
+			request := testutil.NewGetAPIExpandedURLRequest(googleShortSuffix)
 			shortenerServer.ServeHTTP(response, request)
 			gotPair := testutil.GetURLPairFromResponse(t, response.Body)
 			testutil.AssertStatus(t, response.Code, http.StatusOK)
@@ -217,7 +215,7 @@ func TestConcurrentCreateShortURL(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			response := httptest.NewRecorder()
-			request := testutil.NewPostShortURLRequest(store.urlMap[googleShortSuffix])
+			request := testutil.NewPostAPIShortenURLRequest(store.urlMap[googleShortSuffix])
 			shortenerServer.ServeHTTP(response, request)
 
 			testutil.AssertStatus(t, response.Code, http.StatusOK)
@@ -263,7 +261,7 @@ func TestConcurrentCreateAndGetShortURL(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			response := httptest.NewRecorder()
-			request := testutil.NewGetExpandedURLRequest(googleShortSuffix)
+			request := testutil.NewGetAPIExpandedURLRequest(googleShortSuffix)
 			shortenerServer.ServeHTTP(response, request)
 			urlPair := testutil.GetURLPairFromResponse(t, response.Body)
 			assertContentType(t, response, server.JsonContentType)
@@ -277,7 +275,7 @@ func TestConcurrentCreateAndGetShortURL(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			response := httptest.NewRecorder()
-			request := testutil.NewPostShortURLRequest(store.urlMap[githubShortSuffix])
+			request := testutil.NewPostAPIShortenURLRequest(store.urlMap[githubShortSuffix])
 			shortenerServer.ServeHTTP(response, request)
 			urlPair := testutil.GetURLPairFromResponse(t, response.Body)
 			assertContentType(t, response, server.JsonContentType)
@@ -299,7 +297,7 @@ func TestConcurrentCreateAndGetShortURL(t *testing.T) {
 
 func TestInvalidRequestsRoute(t *testing.T) {
 	shortenerServer := server.NewURLShortenerServer(&StubURLStore{}, MockURLShortener{})
-	t.Run("GET request to invalid path", func(t *testing.T) {
+	t.Run("GET request to invalid path returns status 404", func(t *testing.T) {
 		response := httptest.NewRecorder()
 		request, _ := http.NewRequest(http.MethodGet, "/badGet/", nil)
 
@@ -308,7 +306,7 @@ func TestInvalidRequestsRoute(t *testing.T) {
 		testutil.AssertStatus(t, response.Code, http.StatusNotFound)
 	})
 
-	t.Run("POST request to invalid path", func(t *testing.T) {
+	t.Run("POST request to invalid path returns 404", func(t *testing.T) {
 		response := httptest.NewRecorder()
 		request, _ := http.NewRequest(http.MethodPost, "/badPost/", nil)
 
@@ -340,7 +338,7 @@ func TestJSONFunctionality(t *testing.T) {
 
 	t.Run("returns status 200 on valid GET request", func(t *testing.T) {
 		response := httptest.NewRecorder()
-		request := testutil.NewGetExpandedURLRequest(googleShortSuffix)
+		request := testutil.NewGetAPIExpandedURLRequest(googleShortSuffix)
 
 		shortenerServer.ServeHTTP(response, request)
 
@@ -354,7 +352,7 @@ func TestJSONFunctionality(t *testing.T) {
 			ShortSuffix: googleShortSuffix, BaseURL: "google.com",
 		}
 
-		request := testutil.NewGetExpandedURLRequest(googleShortSuffix)
+		request := testutil.NewGetAPIExpandedURLRequest(googleShortSuffix)
 		response := httptest.NewRecorder()
 
 		shortenerServer.ServeHTTP(response, request)
@@ -368,7 +366,7 @@ func TestJSONFunctionality(t *testing.T) {
 
 	t.Run("returns status 200 on valid POST request", func(t *testing.T) {
 		response := httptest.NewRecorder()
-		request := testutil.NewPostShortURLRequest(store.urlMap[googleShortSuffix])
+		request := testutil.NewPostAPIShortenURLRequest(store.urlMap[googleShortSuffix])
 
 		shortenerServer.ServeHTTP(response, request)
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
@@ -377,7 +375,7 @@ func TestJSONFunctionality(t *testing.T) {
 
 	t.Run("returns valid POST request as JSON", func(t *testing.T) {
 		response := httptest.NewRecorder()
-		request := testutil.NewPostShortURLRequest(store.urlMap[googleShortSuffix])
+		request := testutil.NewPostAPIShortenURLRequest(store.urlMap[googleShortSuffix])
 
 		shortenerServer.ServeHTTP(response, request)
 
@@ -421,25 +419,18 @@ func TestHTMXFunctionality(t *testing.T) {
 	})
 
 	t.Run("GET /expand/ with HTMX sets HX-Redirect Header", func(t *testing.T) {
-		request := testutil.NewGetExpandedURLRequest(googleShortSuffix)
-		request.Header.Set("HX-Request", "true")
+		request := testutil.NewGetHTMXExpandedURLRequest(googleShortSuffix)
 		response := httptest.NewRecorder()
 
 		shortenerServer.ServeHTTP(response, request)
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
 		testutil.AssertHTMXRedirect(t, *response.Result(), store.urlMap[googleShortSuffix])
 
-		assertContentType(t, response, server.HtmxContentType)
+		assertContentType(t, response, server.HtmxRequestContentType)
 	})
 
 	t.Run("POST /shorten with HTMX returns HTML partial", func(t *testing.T) {
-		formData := url.Values{}
-		formData.Set("base-url", store.urlMap[googleShortSuffix])
-		body := strings.NewReader(formData.Encode())
-
-		request := httptest.NewRequest(http.MethodPost, server.ShortenRoute, body)
-		request.Header.Set("HX-Request", "true")
-		request.Header.Set("content-type", server.HtmxContentType)
+		request := testutil.NewPostHTMXShortenURLRequest(store.urlMap[googleShortSuffix])
 
 		response := httptest.NewRecorder()
 
@@ -448,7 +439,7 @@ func TestHTMXFunctionality(t *testing.T) {
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
 
 		approvals.VerifyString(t, response.Body.String())
-		assertContentType(t, response, server.HtmxContentType)
+		assertContentType(t, response, server.HtmxResponseContentType)
 
 	})
 }
@@ -463,7 +454,7 @@ func assertURLPairs(t testing.TB, got, want model.URLPair) {
 func assertContentType(t testing.TB, response *httptest.ResponseRecorder, want string) {
 	t.Helper()
 
-	if response.Result().Header.Get("content-type") != want {
+	if response.Result().Header.Get("Content-Type") != want {
 		t.Errorf("response did not have content-type of %s, got %v", want, response.Result().Header)
 	}
 }

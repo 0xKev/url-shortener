@@ -2,8 +2,7 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
-	"log"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -12,10 +11,18 @@ import (
 )
 
 const (
-	ExpandRoute     = "/expand/"
-	ShortenRoute    = "/shorten"
-	JsonContentType = "application/json"
-	HtmxContentType = "application/x-www-form-urlencoded"
+	ExpandRoute             = "/expand/"
+	ShortenRoute            = "/shorten"
+	JsonContentType         = "application/json"
+	HtmxRequestContentType  = "application/x-www-form-urlencoded"
+	HtmxResponseContentType = "text/html; charset=utf-8"
+
+	APIVersion      = "v1"
+	APIExpandRoute  = "/api/" + APIVersion + ExpandRoute
+	APIShortenRoute = "/api/" + APIVersion + ShortenRoute
+
+	HtmxExpandRoute  = ExpandRoute
+	HtmxShortenRoute = ShortenRoute
 )
 
 type URLShortener interface {
@@ -44,10 +51,13 @@ func NewURLShortenerServer(store URLStore, shortener URLShortener) *URLShortener
 
 	router := http.NewServeMux()
 	router.HandleFunc("/", server.indexHandler)
-	router.Handle(ShortenRoute, http.HandlerFunc(server.shortenHandler))
-	router.Handle(ExpandRoute, http.HandlerFunc(server.expandHandler))
+	router.Handle(APIShortenRoute, http.HandlerFunc(server.shortenHandler))
+	router.Handle(APIExpandRoute, http.HandlerFunc(server.expandHandler))
 
-	log.Printf("Routes registered: /, %s, %s", ShortenRoute, ExpandRoute)
+	router.Handle(HtmxShortenRoute, http.HandlerFunc(server.shortenHandler))
+	router.Handle(HtmxExpandRoute, http.HandlerFunc(server.expandHandler))
+
+	// log.Printf("Routes registered: /, %s, %s", ShortenRoute, ExpandRoute)
 
 	server.Handler = router
 
@@ -66,65 +76,140 @@ func (u *URLShortenerServer) indexHandler(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		panic(err)
 	}
-	log.Println("Index rendered successfully")
 }
 
 func (u *URLShortenerServer) shortenHandler(w http.ResponseWriter, r *http.Request) {
-	u.processShortURL(w, r)
+	if u.isAPIRequest(r) {
+		u.processAPIShortURL(w, r)
+	} else if u.isHTMXRequest(r) {
+		u.processHTMXShortURL(w, r)
+	}
 }
 
 func (u *URLShortenerServer) expandHandler(w http.ResponseWriter, r *http.Request) {
-	u.showExpandedURL(w, r)
+	if u.isAPIRequest(r) {
+		w.Header().Set("Content-Type", JsonContentType)
+		u.showAPIExpandedURL(w, r)
+	} else if u.isHTMXRequest(r) {
+		w.Header().Set("Content-Type", HtmxRequestContentType)
+		u.showHTMXExpandedURL(w, r)
+	}
+
 }
 
-func (u *URLShortenerServer) showExpandedURL(w http.ResponseWriter, r *http.Request) {
-	shortLink := strings.TrimPrefix(r.URL.Path, ExpandRoute)
-	expandedURL, found := u.store.Load(shortLink)
-	htmxRequest := r.Header.Get("HX-Request")
+func (u *URLShortenerServer) isHTMXRequest(r *http.Request) bool {
+	return r.Header.Get("HX-Request") == "true"
+}
 
-	if htmxRequest != "" {
-		w.Header().Set("HX-Redirect", expandedURL)
+func (u *URLShortenerServer) isAPIRequest(r *http.Request) bool {
+	return r.Header.Get("Content-Type") == JsonContentType
+}
+
+func (u *URLShortenerServer) showHTMXExpandedURL(w http.ResponseWriter, r *http.Request) {
+	shortSuffix := strings.TrimPrefix(r.URL.Path, HtmxExpandRoute)
+	baseURL, found := u.store.Load(shortSuffix)
+	if !found {
+		http.Error(w, "baseURL not found", http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("HX-Redirect", baseURL)
+}
 
-	w.Header().Set("content-type", JsonContentType)
+func (u *URLShortenerServer) showAPIExpandedURL(w http.ResponseWriter, r *http.Request) {
+	shortSuffix := strings.TrimPrefix(r.URL.Path, APIExpandRoute)
+
+	expandedURL, found := u.store.Load(shortSuffix)
+	w.Header().Set("Content-Type", JsonContentType)
 	if !found {
 		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "URL not found"})
 		return
 	}
-	json.NewEncoder(w).Encode(u.getURLPair(shortLink, expandedURL))
+	json.NewEncoder(w).Encode(u.getURLPair(shortSuffix, expandedURL))
 }
 
 func (u *URLShortenerServer) getURLPair(shortURL, baseURL string) model.URLPair {
 	return model.URLPair{ShortSuffix: shortURL, BaseURL: baseURL}
 }
 
-func (u *URLShortenerServer) processShortURL(w http.ResponseWriter, r *http.Request) {
+func (u *URLShortenerServer) processAPIShortURL(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
-	baseURL := r.FormValue("base-url")
 
-	shortURL, err := u.shortener.ShortenURL(baseURL)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Could not shorten URL: %v", err), http.StatusInternalServerError)
-		return
-	}
-	if r.Header.Get("HX-Request") == "true" {
-		w.Header().Set("content-type", HtmxContentType)
-		log.Printf("base url: '%v', shorturl: '%v'", baseURL, shortURL)
-		err := u.renderer.Render(w, model.URLPair{BaseURL: baseURL, ShortSuffix: shortURL})
+	var urlPair *model.URLPair
+	var err error
+
+	if r.Header.Get("Content-Type") == JsonContentType {
+		w.Header().Set("Content-Type", JsonContentType) // set response to Json contenttype if request same
+		urlPair, err = u.processJSONShortURL(w, r)
 		if err != nil {
-			panic(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
-		return
 	}
-	w.Header().Set("content-type", JsonContentType)
+
+	if r.Header.Get("HX-Request") == "true" {
+		urlPair, err = u.processHTMXShortURL(w, r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
 	w.WriteHeader(http.StatusOK)
-	response := u.getURLPair(shortURL, baseURL)
-	json.NewEncoder(w).Encode(response)
-	u.store.Save(shortURL, baseURL)
+	u.store.Save(*urlPair)
+}
+
+func (u *URLShortenerServer) processHTMXShortURL(w http.ResponseWriter, r *http.Request) (*model.URLPair, error) {
+	baseURL := r.FormValue("base-url")
+	if baseURL == "" {
+		return nil, errors.New("could not process baseURL from HTMX request")
+	}
+	shortSuffix, err := u.shortener.ShortenURL(baseURL)
+	if err != nil {
+		return nil, errors.New("could not shorten baseURL: " + err.Error())
+	}
+
+	urlPair := model.URLPair{BaseURL: baseURL, ShortSuffix: shortSuffix}
+	err = u.renderer.Render(w, urlPair)
+	if err != nil {
+		panic(err)
+	}
+	return &urlPair, nil
+}
+
+func (u *URLShortenerServer) processJSONShortURL(w http.ResponseWriter, r *http.Request) (*model.URLPair, error) {
+	var urlPair = model.URLPair{}
+	err := json.NewDecoder(r.Body).Decode(&urlPair)
+
+	if err != nil {
+		return nil, errors.New("error decoding json")
+	}
+
+	// VALIDATE URL THEN RETURN ERROR IF INVALID
+	if urlPair.BaseURL == "" {
+		w.WriteHeader(http.StatusInternalServerError)
+		return nil, errors.New("base url is empty")
+	}
+
+	shortSuffix, err := u.shortener.ShortenURL(urlPair.BaseURL)
+	if err != nil {
+		// issue might be here
+		return nil, errors.New("could not shorten baseURL: " + err.Error())
+	}
+
+	w.WriteHeader(http.StatusOK)
+
+	urlPair.ShortSuffix = shortSuffix
+	err = json.NewEncoder(w).Encode(urlPair)
+	if err != nil {
+		return nil, errors.New("could not encode to JSON: " + err.Error())
+	}
+
+	return &urlPair, nil
 }
 
 type URLStore interface {
-	Save(shortLink, baseURL string) error
-	Load(shortLink string) (string, bool)
+	Save(model.URLPair) error
+	Load(shortSuffix string) (string, bool)
 }

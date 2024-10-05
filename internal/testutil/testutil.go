@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -12,21 +13,59 @@ import (
 	"github.com/0xKev/url-shortener/internal/server"
 )
 
-func NewGetExpandedURLRequest(shortSuffix string) *http.Request {
-	request, _ := http.NewRequest(http.MethodGet, server.ExpandRoute+shortSuffix, nil)
+func NewGetAPIExpandedURLRequest(shortSuffix string) *http.Request {
+	request, _ := http.NewRequest(http.MethodGet, server.APIExpandRoute+shortSuffix, nil)
+	request.Header.Set("Content-Type", server.JsonContentType)
 	return request
 }
 
-func NewPostShortURLRequest(baseURL string) *http.Request {
+func NewPostAPIShortenURLRequest(baseURL string) *http.Request {
+	urlPair := model.URLPair{BaseURL: baseURL, ShortSuffix: ""}
+	body := new(bytes.Buffer)
+
+	err := json.NewEncoder(body).Encode(urlPair)
+	if err != nil {
+		// log.Fatalf("Error encoding URLPair: %v", err)
+		return nil
+	}
+	request, err := http.NewRequest(http.MethodPost, server.APIShortenRoute, body)
+	if err != nil {
+		// log.Fatalf("Error creating request: %v", err)
+		return nil
+	}
+	request.Header.Set("Content-Type", server.JsonContentType)
+	// log.Printf("Request body: %s", body.String())
+	return request
+}
+
+func NewGetHTMXExpandedURLRequest(shortSuffix string) *http.Request {
+	request, err := http.NewRequest(http.MethodGet, server.HtmxExpandRoute+shortSuffix, nil)
+	if err != nil {
+		return nil
+	}
+
+	request.Header.Set("HX-Request", "true")
+	return request
+}
+
+func NewPostHTMXShortenURLRequest(baseURL string) *http.Request {
+	// use form data instead of json
+
 	formData := url.Values{}
 	formData.Set("base-url", baseURL)
 	body := strings.NewReader(formData.Encode())
-	request, _ := http.NewRequest(http.MethodPost, server.ShortenRoute, body)
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	request, err := http.NewRequest(http.MethodPost, server.HtmxShortenRoute, body)
+	if err != nil {
+		return nil
+	}
+	request.Header.Set("HX-Request", "true")
+	request.Header.Set("Content-Type", server.HtmxRequestContentType)
 	return request
 }
 
 func AssertHTMXRedirect(t testing.TB, got http.Response, want string) {
+	t.Helper()
 	if got.Header.Get("HX-Redirect") != want {
 		t.Errorf("expected HX-Redirect to '%v' but got '%v'", want, got.Header.Get("HX-Redirect"))
 	}
