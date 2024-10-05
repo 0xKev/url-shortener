@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xKev/url-shortener/internal/model"
 	"github.com/0xKev/url-shortener/internal/testutil"
 	"github.com/redis/go-redis/v9"
 )
@@ -85,7 +86,7 @@ func TestRedisURLStoreImplementation(t *testing.T) {
 
 	urlStore := RedisURLStore{client: client}
 
-	err := urlStore.Save(shortSuffix, baseURL)
+	err := urlStore.Save(model.URLPair{BaseURL: baseURL, ShortSuffix: shortSuffix})
 
 	if err != nil {
 		t.Fatalf("Save method error, %v", err)

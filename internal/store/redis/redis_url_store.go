@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/0xKev/url-shortener/internal/model"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -42,11 +43,11 @@ func validateRedisConfig(client redis.Client) error {
 	return nil
 }
 
-func (r *RedisURLStore) Save(shortLink, baseURL string) error {
+func (r *RedisURLStore) Save(urlPair model.URLPair) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err := r.client.Set(ctx, shortLink, baseURL, 0).Err()
+	err := r.client.Set(ctx, urlPair.ShortSuffix, urlPair.BaseURL, 0).Err()
 
 	if err != nil {
 		return fmt.Errorf("error when saving short link to redis, %v", err)
