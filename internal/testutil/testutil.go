@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -117,5 +118,13 @@ func AssertNoHTMXRedirect(t testing.TB, response http.Response) {
 
 	if response.Header.Get("HX-Redirect") != "" {
 		t.Fatal("did not expect an HX-Redirect but got one")
+	}
+}
+
+func AssertContentType(t testing.TB, response *httptest.ResponseRecorder, want string) {
+	t.Helper()
+
+	if response.Result().Header.Get("Content-Type") != want {
+		t.Errorf("response did not have content-type of %s, got %v", want, response.Result().Header)
 	}
 }
