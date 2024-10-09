@@ -46,6 +46,8 @@ func NewGetHTMXExpandedURLRequest(shortSuffix string) *http.Request {
 	}
 
 	request.Header.Set("HX-Request", "true")
+	request.Header.Set("Content-Type", server.HtmxRequestContentType)
+
 	return request
 }
 

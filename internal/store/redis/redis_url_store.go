@@ -56,11 +56,10 @@ func (r *RedisURLStore) Save(urlPair model.URLPair) error {
 	return nil
 }
 
-func (r *RedisURLStore) Load(shortLink string) (string, bool) {
+func (r *RedisURLStore) Load(shortSuffix string) (string, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
-	val, err := r.client.Get(ctx, shortLink).Result()
+	val, err := r.client.Get(ctx, shortSuffix).Result()
 
 	if err != nil {
 		return "", false

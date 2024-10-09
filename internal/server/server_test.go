@@ -76,7 +76,7 @@ func TestAPIGETExpandShortURL(t *testing.T) {
 		googlePair := testutil.GetURLPairFromResponse(t, getGoogleResponse.Body)
 
 		testutil.AssertStatus(t, getGoogleResponse.Code, http.StatusOK)
-		assertContentType(t, getGoogleResponse, server.JsonContentType)
+		testutil.AssertContentType(t, getGoogleResponse, server.JsonContentType)
 		assertURLPairs(t, googlePair, store.urlPair[0])
 
 		getGithubReq := testutil.NewGetAPIExpandedURLRequest(githubShortSuffix)
@@ -86,7 +86,7 @@ func TestAPIGETExpandShortURL(t *testing.T) {
 		githubPair := testutil.GetURLPairFromResponse(t, getGithubResponse.Body)
 
 		testutil.AssertStatus(t, getGithubResponse.Code, http.StatusOK)
-		assertContentType(t, getGithubResponse, server.JsonContentType)
+		testutil.AssertContentType(t, getGithubResponse, server.JsonContentType)
 		assertURLPairs(t, githubPair, store.urlPair[1])
 
 		if len(store.getURLCalls) != expectedCalls {
@@ -132,7 +132,7 @@ func TestAPICreateShortURL(t *testing.T) {
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
 
 		urlPair := testutil.GetURLPairFromResponse(t, response.Body)
-		assertContentType(t, response, server.JsonContentType)
+		testutil.AssertContentType(t, response, server.JsonContentType)
 		assertURLPairs(t, urlPair, model.URLPair{ShortSuffix: expectedShortSuffix, BaseURL: baseUrl})
 
 		if len(store.shortURLCalls) != 1 {
@@ -176,7 +176,7 @@ func TestAPIConcurrentGETExpandShortURL(t *testing.T) {
 			shortenerServer.ServeHTTP(response, request)
 			gotPair := testutil.GetURLPairFromResponse(t, response.Body)
 			testutil.AssertStatus(t, response.Code, http.StatusOK)
-			assertContentType(t, response, server.JsonContentType)
+			testutil.AssertContentType(t, response, server.JsonContentType)
 			assertURLPairs(t, gotPair, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: "google.com"})
 		}()
 	}
@@ -220,7 +220,7 @@ func TestConcurrentCreateShortURL(t *testing.T) {
 
 			testutil.AssertStatus(t, response.Code, http.StatusOK)
 			gotPair := testutil.GetURLPairFromResponse(t, response.Body)
-			assertContentType(t, response, server.JsonContentType)
+			testutil.AssertContentType(t, response, server.JsonContentType)
 			assertURLPairs(t, gotPair, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: store.urlMap[googleShortSuffix]})
 		}()
 	}
@@ -264,7 +264,7 @@ func TestConcurrentCreateAndGetShortURL(t *testing.T) {
 			request := testutil.NewGetAPIExpandedURLRequest(googleShortSuffix)
 			shortenerServer.ServeHTTP(response, request)
 			urlPair := testutil.GetURLPairFromResponse(t, response.Body)
-			assertContentType(t, response, server.JsonContentType)
+			testutil.AssertContentType(t, response, server.JsonContentType)
 			assertURLPairs(t, urlPair, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: store.urlMap[googleShortSuffix]})
 
 			testutil.AssertStatus(t, response.Code, http.StatusOK)
@@ -278,7 +278,7 @@ func TestConcurrentCreateAndGetShortURL(t *testing.T) {
 			request := testutil.NewPostAPIShortenURLRequest(store.urlMap[githubShortSuffix])
 			shortenerServer.ServeHTTP(response, request)
 			urlPair := testutil.GetURLPairFromResponse(t, response.Body)
-			assertContentType(t, response, server.JsonContentType)
+			testutil.AssertContentType(t, response, server.JsonContentType)
 			assertURLPairs(t, urlPair, model.URLPair{ShortSuffix: githubShortSuffix, BaseURL: store.urlMap[githubShortSuffix]})
 
 			testutil.AssertStatus(t, response.Code, http.StatusOK)
@@ -356,7 +356,7 @@ func TestJSONFunctionality(t *testing.T) {
 		response := httptest.NewRecorder()
 
 		shortenerServer.ServeHTTP(response, request)
-		assertContentType(t, response, server.JsonContentType)
+		testutil.AssertContentType(t, response, server.JsonContentType)
 		testutil.AssertNoHTMXRedirect(t, *response.Result())
 
 		got := testutil.GetURLPairFromResponse(t, response.Body)
@@ -370,7 +370,7 @@ func TestJSONFunctionality(t *testing.T) {
 
 		shortenerServer.ServeHTTP(response, request)
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
-		assertContentType(t, response, server.JsonContentType)
+		testutil.AssertContentType(t, response, server.JsonContentType)
 	})
 
 	t.Run("returns valid POST request as JSON", func(t *testing.T) {
@@ -381,7 +381,7 @@ func TestJSONFunctionality(t *testing.T) {
 
 		got := testutil.GetURLPairFromResponse(t, response.Body)
 
-		assertContentType(t, response, server.JsonContentType)
+		testutil.AssertContentType(t, response, server.JsonContentType)
 		assertURLPairs(t, got, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: store.urlMap[googleShortSuffix]})
 	})
 
@@ -426,7 +426,7 @@ func TestHTMXFunctionality(t *testing.T) {
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
 		testutil.AssertHTMXRedirect(t, *response.Result(), store.urlMap[googleShortSuffix])
 
-		assertContentType(t, response, server.HtmxRequestContentType)
+		testutil.AssertContentType(t, response, server.HtmxRequestContentType)
 	})
 
 	t.Run("POST /shorten with HTMX returns HTML partial", func(t *testing.T) {
@@ -439,7 +439,7 @@ func TestHTMXFunctionality(t *testing.T) {
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
 
 		approvals.VerifyString(t, response.Body.String())
-		assertContentType(t, response, server.HtmxResponseContentType)
+		testutil.AssertContentType(t, response, server.HtmxResponseContentType)
 
 	})
 }
@@ -448,13 +448,5 @@ func assertURLPairs(t testing.TB, got, want model.URLPair) {
 	t.Helper()
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v want %v", got, want)
-	}
-}
-
-func assertContentType(t testing.TB, response *httptest.ResponseRecorder, want string) {
-	t.Helper()
-
-	if response.Result().Header.Get("Content-Type") != want {
-		t.Errorf("response did not have content-type of %s, got %v", want, response.Result().Header)
 	}
 }

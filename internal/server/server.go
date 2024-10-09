@@ -91,7 +91,7 @@ func (u *URLShortenerServer) expandHandler(w http.ResponseWriter, r *http.Reques
 		w.Header().Set("Content-Type", JsonContentType)
 		u.showAPIExpandedURL(w, r)
 	} else if u.isHTMXRequest(r) {
-		w.Header().Set("Content-Type", HtmxRequestContentType)
+		w.Header().Set("Content-Type", HtmxResponseContentType)
 		u.showHTMXExpandedURL(w, r)
 	}
 
