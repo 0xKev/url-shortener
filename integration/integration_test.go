@@ -114,7 +114,7 @@ func TestHTMXRecordingBaseURLsAndRetrievingThem(t *testing.T) {
 
 }
 
-func fetchShortSuffixes(t testing.TB, start uint64, increments uint64, encoder shortener.Encoder) []string {
+func fetchShortSuffixes(t testing.TB, start uint64, increments uint64) []string {
 	t.Helper()
 	var shortSuffixes []string
 
