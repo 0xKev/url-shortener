@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/0xKev/url-shortener/internal/base62"
+	"github.com/0xKev/url-shortener/internal/model"
 	"github.com/0xKev/url-shortener/internal/server"
 	"github.com/0xKev/url-shortener/internal/shortener"
 	redisStore "github.com/0xKev/url-shortener/internal/store/redis"
@@ -25,11 +26,21 @@ const (
 )
 
 func main() {
-	storeConfig := redisStore.NewRedisConfig(redisAddr, redisAddr, redisDB)
+	storeConfig := redisStore.NewRedisConfig(redisAddr, redisPass, redisDB)
 	store, err := redisStore.NewRedisURLStore(storeConfig)
 	if err != nil {
 		log.Fatalf("error when creating redis store %v", err)
 	}
-	shortenerServer := server.NewURLShortenerServer(store, shortener.NewURLShortener(nil, encoder))
+	testShortSuffix := "testurl"
+	testBaseURL := "https://www.example.com"
+	err = store.Save(model.URLPair{testShortSuffix, testBaseURL})
+	if err != nil {
+		log.Printf("Error saving test URL: %v", err)
+	} else {
+		log.Printf("Test URL saved: %s -> %s", testShortSuffix, testBaseURL)
+	}
+	shortenerConfig := shortener.NewDefaultConfig()
+	shortenerConfig.SetDomain("localhost:5000")
+	shortenerServer := server.NewURLShortenerServer(store, shortener.NewURLShortener(shortenerConfig, encoder))
 	log.Fatal(http.ListenAndServe(":5000", shortenerServer))
 }

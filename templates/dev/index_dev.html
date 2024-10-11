@@ -14,9 +14,9 @@
         <p class="text-accent-500">Simplify your link instantly.</p>
     </header>
     <main class="flex justify-center">
-        <div class="w-full max-w-2xl">
+        <div class="w-full max-w-2xl" id="content-area">
             <div id="shorten-url" class="m-8 shadow-lg border bg-background p-6 rounded-lg space-y-4">
-                <form hx-get="url_pair_dev.html" hx-target="#result" hx-swap="innerHTML" class="space-y-4">
+                <form hx-get="url_pair_dev.html" hx-target="#shorten-url" hx-swap="outerHTML" class="space-y-4">
                     <div class="space-y-2">
                         <h3 class="text-lg font-semibold">Shorten link here :)</h3>
                         <input type="url" name="base-url" placeholder="Enter link here" class="border rounded w-full p-2">

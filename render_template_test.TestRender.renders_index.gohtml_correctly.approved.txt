@@ -4,28 +4,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://unpkg.com/htmx.org@2.0.2" integrity="sha384-Y7hw+L/jvKeWIRRkqWYfPcvVxHzVzn5REgzbawhxAuQGwX1XWe70vji+VSeHOThJ" crossorigin="anonymous"></script>
-    <link href="../static/css/output.css" rel="stylesheet">
     <title>URL Shortener</title>
+    <script src="https://unpkg.com/htmx.org@2.0.2" integrity="sha384-Y7hw+L/jvKeWIRRkqWYfPcvVxHzVzn5REgzbawhxAuQGwX1XWe70vji+VSeHOThJ" crossorigin="anonymous"></script>
+    <link href="../../static/css/output.css" rel="stylesheet">
+    
 </head>
-
-<body>
-    <header class="flex justify-center items-center space-x-2 p-8">
-        <p class="">URL Shortener</p>
+<body class="bg-secondary">
+    <header class="text-center p-8 space-y-2">
+        <h1 class="text-2xl font-bold">URL Shortener</h1>
         <p class="text-accent-500">Simplify your link instantly.</p>
     </header>
 
 <main class="flex justify-center">
-    <div id="shorten-url" class="m-8 shadow-lg border w-full max-w-2xl p-6 rounded-lg">
-        <div class="items-center justify-center">
-            <div class="flex flex-col">
-                <h3>Shorten link here :)</h3>
-                <input type="url" name="base-url" placeholder="Enter link here" class="border">
-            </div>
-            <button type="submit" hx-post="/shorten" hx-include="[name='base-url']" class="bg-primary rounded-md px-2 py-1 text">Shorten</button>
+    <div class="w-full max-w-2xl">
+        <div id="shorten-url" class="m-8 shadow-lg border bg-background p-6 rounded-lg space-y-4">
+            <form hx-get="/shorten" hx-target="#result" hx-swap="innerHTML" class="space-y-4">
+                <div class="space-y-2">
+                    <h3 class="text-lg font-semibold">Shorten link here :)</h3>
+                    <input type="url" name="base-url" placeholder="Enter link here" class="border rounded w-full p-2">
+                </div>
+                <button type="submit" class="bg-primary text-background rounded-md px-4 py-2 hover:bg-accent transition">Shorten</button>
+            </form>
         </div>
+        <div id="result" class="m-8"></div>
     </div>
 </main>
 
 
 
+</body>
+</html>

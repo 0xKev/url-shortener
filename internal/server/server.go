@@ -83,6 +83,8 @@ func (u *URLShortenerServer) shortenHandler(w http.ResponseWriter, r *http.Reque
 		u.processAPIShortURL(w, r)
 	} else if u.isHTMXRequest(r) {
 		u.processHTMXShortURL(w, r)
+	} else {
+		u.processHTMXShortURL(w, r)
 	}
 }
 
@@ -92,6 +94,8 @@ func (u *URLShortenerServer) expandHandler(w http.ResponseWriter, r *http.Reques
 		u.showAPIExpandedURL(w, r)
 	} else if u.isHTMXRequest(r) {
 		w.Header().Set("Content-Type", HtmxResponseContentType)
+		u.showHTMXExpandedURL(w, r)
+	} else { // error is that the get requests are normal web requests and not htmx
 		u.showHTMXExpandedURL(w, r)
 	}
 
@@ -112,7 +116,11 @@ func (u *URLShortenerServer) showHTMXExpandedURL(w http.ResponseWriter, r *http.
 		http.Error(w, "baseURL not found", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("HX-Redirect", baseURL)
+	if u.isHTMXRequest(r) {
+		w.Header().Set("HX-Redirect", baseURL)
+	} else { // normal redirect for normal web requests
+		http.Redirect(w, r, baseURL, http.StatusPermanentRedirect)
+	}
 }
 
 func (u *URLShortenerServer) showAPIExpandedURL(w http.ResponseWriter, r *http.Request) {
@@ -171,6 +179,7 @@ func (u *URLShortenerServer) processHTMXShortURL(w http.ResponseWriter, r *http.
 	}
 
 	urlPair := model.URLPair{BaseURL: baseURL, ShortSuffix: shortSuffix}
+	u.store.Save(urlPair)
 	err = u.renderer.Render(w, urlPair)
 	if err != nil {
 		panic(err)

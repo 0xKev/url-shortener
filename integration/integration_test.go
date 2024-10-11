@@ -77,7 +77,7 @@ func TestAPIRecordingBaseURLsAndRetrievingThem(t *testing.T) {
 
 func TestHTMXRecordingBaseURLsAndRetrievingThem(t *testing.T) {
 	shortenerConfig := shortener.NewDefaultConfig()
-	shortSuffixes := fetchShortSuffixes(t, shortenerConfig.URLCounter(), uint64(len(baseURLs)), encoder)
+	shortSuffixes := fetchShortSuffixes(t, shortenerConfig.URLCounter(), uint64(len(baseURLs)))
 	t.Log("length of shortSuffixes is", shortSuffixes)
 	urlShortener := shortener.NewURLShortener(shortenerConfig, encoder)
 	storeConfig := redis_store.NewRedisConfig(redisAddr, redisPass, redisDB)
