@@ -23,6 +23,8 @@ const (
 
 	HtmxExpandRoute  = ExpandRoute
 	HtmxShortenRoute = ShortenRoute
+
+	DefaultDomain = "localhost:5000/"
 )
 
 type URLShortener interface {
@@ -33,6 +35,7 @@ type URLShortenerServer struct {
 	store     URLStore
 	shortener URLShortener
 	renderer  *urlrenderer.URLPairRenderer
+	domain    string
 	http.Handler
 }
 
@@ -47,6 +50,7 @@ func NewURLShortenerServer(store URLStore, shortener URLShortener) *URLShortener
 		store:     store,
 		shortener: shortener,
 		renderer:  renderer,
+		domain:    DefaultDomain,
 	}
 
 	router := http.NewServeMux()
@@ -63,6 +67,16 @@ func NewURLShortenerServer(store URLStore, shortener URLShortener) *URLShortener
 
 	return server
 
+}
+
+func (u *URLShortenerServer) SetDomain(domain string) error {
+	// TODO(MED): Check for valid domain
+	u.domain = domain
+	return nil
+}
+
+func (u *URLShortenerServer) GetDomain() string {
+	return u.domain
 }
 
 func (u *URLShortenerServer) indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -137,7 +151,7 @@ func (u *URLShortenerServer) showAPIExpandedURL(w http.ResponseWriter, r *http.R
 }
 
 func (u *URLShortenerServer) getURLPair(shortURL, baseURL string) model.URLPair {
-	return model.URLPair{ShortSuffix: shortURL, BaseURL: baseURL}
+	return model.URLPair{ShortSuffix: shortURL, BaseURL: baseURL, Domain: u.domain}
 }
 
 func (u *URLShortenerServer) processAPIShortURL(w http.ResponseWriter, r *http.Request) {
@@ -156,13 +170,13 @@ func (u *URLShortenerServer) processAPIShortURL(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	if r.Header.Get("HX-Request") == "true" {
-		urlPair, err = u.processHTMXShortURL(w, r)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
+	// if r.Header.Get("HX-Request") == "true" {
+	// 	urlPair, err = u.processHTMXShortURL(w, r)
+	// 	if err != nil {
+	// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 		return
+	// 	}
+	// }
 
 	w.WriteHeader(http.StatusOK)
 	u.store.Save(*urlPair)
@@ -178,7 +192,7 @@ func (u *URLShortenerServer) processHTMXShortURL(w http.ResponseWriter, r *http.
 		return nil, errors.New("could not shorten baseURL: " + err.Error())
 	}
 
-	urlPair := model.URLPair{BaseURL: baseURL, ShortSuffix: shortSuffix}
+	urlPair := u.getURLPair(shortSuffix, baseURL)
 	u.store.Save(urlPair)
 	err = u.renderer.Render(w, urlPair)
 	if err != nil {

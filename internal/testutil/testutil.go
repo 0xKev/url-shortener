@@ -130,3 +130,10 @@ func AssertContentType(t testing.TB, response *httptest.ResponseRecorder, want s
 		t.Errorf("response did not have content-type of %s, got %v", want, response.Result().Header)
 	}
 }
+
+func AssertEqual[T comparable](t *testing.T, got, want T) {
+	t.Helper()
+	if got != want {
+		t.Errorf("expected '%v' but got '%v'", want, got)
+	}
+}

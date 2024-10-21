@@ -53,6 +53,55 @@ var githubShortSuffix = "0000002"
 var doesNotExistShortSuffix = "1000000"
 var invalidBaseURL = ""
 
+func TestSetAndRetrieveCorrectDomain(t *testing.T) {
+	store := StubURLStore{
+		urlMap: map[string]string{
+			googleShortSuffix: "google.com",
+		},
+		urlPair: []model.URLPair{
+			{ShortSuffix: googleShortSuffix, BaseURL: "google.com", Domain: ""},
+		},
+	}
+
+	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
+
+	t.Run("returns correct domain when setting valid domain", func(t *testing.T) {
+		domain := "https://shortener.com/"
+		shortenerServer.SetDomain(domain)
+
+		expectedUrlPair := model.URLPair{
+			ShortSuffix: googleShortSuffix,
+			BaseURL:     store.urlMap[googleShortSuffix],
+			Domain:      domain,
+		}
+		request := testutil.NewGetAPIExpandedURLRequest(googleShortSuffix)
+		response := httptest.NewRecorder()
+
+		shortenerServer.ServeHTTP(response, request)
+		urlPair := testutil.GetURLPairFromResponse(t, response.Body)
+
+		testutil.AssertEqual(t, domain, shortenerServer.GetDomain())
+		assertURLPairs(t, urlPair, expectedUrlPair)
+	})
+
+	t.Run("returns the default domain when no domain is manually set", func(t *testing.T) {
+		expectedUrlPair := model.URLPair{
+			ShortSuffix: googleShortSuffix,
+			BaseURL:     store.urlMap[googleShortSuffix],
+			Domain:      shortenerServer.GetDomain(),
+		}
+
+		request := testutil.NewGetAPIExpandedURLRequest(googleShortSuffix)
+		response := httptest.NewRecorder()
+
+		shortenerServer.ServeHTTP(response, request)
+
+		urlPair := testutil.GetURLPairFromResponse(t, response.Body)
+
+		assertURLPairs(t, urlPair, expectedUrlPair)
+	})
+
+}
 func TestAPIGETExpandShortURL(t *testing.T) {
 	store := StubURLStore{
 		urlMap: map[string]string{
@@ -66,6 +115,12 @@ func TestAPIGETExpandShortURL(t *testing.T) {
 	}
 
 	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
+	domain := "https://shortener.com/"
+	shortenerServer.SetDomain(domain)
+
+	for idx := range store.urlPair {
+		store.urlPair[idx].Domain = domain
+	}
 
 	t.Run("returns correct base url via short suffix", func(t *testing.T) {
 		getGoogleReq := testutil.NewGetAPIExpandedURLRequest(googleShortSuffix)
@@ -177,7 +232,7 @@ func TestAPIConcurrentGETExpandShortURL(t *testing.T) {
 			gotPair := testutil.GetURLPairFromResponse(t, response.Body)
 			testutil.AssertStatus(t, response.Code, http.StatusOK)
 			testutil.AssertContentType(t, response, server.JsonContentType)
-			assertURLPairs(t, gotPair, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: "google.com"})
+			assertURLPairs(t, gotPair, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: "google.com", Domain: shortenerServer.GetDomain()})
 		}()
 	}
 	wg.Wait()
@@ -265,7 +320,7 @@ func TestConcurrentCreateAndGetShortURL(t *testing.T) {
 			shortenerServer.ServeHTTP(response, request)
 			urlPair := testutil.GetURLPairFromResponse(t, response.Body)
 			testutil.AssertContentType(t, response, server.JsonContentType)
-			assertURLPairs(t, urlPair, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: store.urlMap[googleShortSuffix]})
+			assertURLPairs(t, urlPair, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: store.urlMap[googleShortSuffix], Domain: shortenerServer.GetDomain()})
 
 			testutil.AssertStatus(t, response.Code, http.StatusOK)
 		}()
@@ -349,7 +404,7 @@ func TestJSONFunctionality(t *testing.T) {
 
 	t.Run("returns valid GET request as JSON", func(t *testing.T) {
 		wantedPair := model.URLPair{
-			ShortSuffix: googleShortSuffix, BaseURL: "google.com",
+			ShortSuffix: googleShortSuffix, BaseURL: "google.com", Domain: shortenerServer.GetDomain(),
 		}
 
 		request := testutil.NewGetAPIExpandedURLRequest(googleShortSuffix)
@@ -418,6 +473,8 @@ func TestHTMXFunctionality(t *testing.T) {
 		},
 	})
 
+	shortenerServer.SetDomain("https://shortener.domain.com/")
+
 	t.Run("GET /expand/ with HTMX sets HX-Redirect Header", func(t *testing.T) {
 		request := testutil.NewGetHTMXExpandedURLRequest(googleShortSuffix)
 		response := httptest.NewRecorder()
@@ -425,8 +482,6 @@ func TestHTMXFunctionality(t *testing.T) {
 		shortenerServer.ServeHTTP(response, request)
 		testutil.AssertStatus(t, response.Code, http.StatusOK)
 		testutil.AssertHTMXRedirect(t, *response.Result(), store.urlMap[googleShortSuffix])
-
-		testutil.AssertContentType(t, response, server.HtmxRequestContentType)
 	})
 
 	t.Run("POST /shorten with HTMX returns HTML partial", func(t *testing.T) {

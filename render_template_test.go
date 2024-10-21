@@ -15,6 +15,7 @@ func TestRender(t *testing.T) {
 		urlPair = model.URLPair{
 			ShortSuffix: "0000001",
 			BaseURL:     "google.com",
+			Domain:      "https://s.domain.com/",
 		}
 	)
 
