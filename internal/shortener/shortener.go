@@ -9,7 +9,6 @@ import (
 // max counter limit  3521614606207 base62 encoding -> zzzzzzz max length of 7
 
 const (
-	defaultDomain          = "example.com/"
 	defaultURLSuffixLength = 7
 	defaultURLCounterLimit = 3521614606207
 	defaultURLCounter      = 500
@@ -47,7 +46,6 @@ func (i InvalidURLError) Error() string {
 }
 
 type Config struct {
-	domain          string
 	urlSuffixLength uint64
 	urlCounterLimit uint64
 	urlCounter      uint64
@@ -55,7 +53,6 @@ type Config struct {
 
 func NewDefaultConfig() *Config {
 	return &Config{
-		domain:          defaultDomain,
 		urlSuffixLength: defaultURLSuffixLength,
 		urlCounterLimit: defaultURLCounterLimit,
 		urlCounter:      defaultURLCounter,
@@ -66,20 +63,12 @@ func (c *Config) URLSuffixLength() uint64 {
 	return c.urlSuffixLength
 }
 
-func (c *Config) Domain() string {
-	return c.domain
-}
-
 func (c *Config) URLCounterLimit() uint64 {
 	return c.urlCounterLimit
 }
 
 func (c *Config) URLCounter() uint64 {
 	return c.urlCounter
-}
-
-func (c *Config) SetDomain(domain string) {
-	c.domain = domain
 }
 
 func (c *Config) SetURLCounter(counter uint64) {

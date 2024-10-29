@@ -14,6 +14,7 @@ import (
 	approvals "github.com/approvals/go-approval-tests"
 )
 
+// TODO(HIGH): Refactor server tests using test data create helpers and tables
 type StubURLStore struct {
 	urlMap        map[string]string
 	shortURLCalls []string
@@ -53,56 +54,8 @@ var githubShortSuffix = "0000002"
 var doesNotExistShortSuffix = "1000000"
 var invalidBaseURL = ""
 
-func TestSetAndRetrieveCorrectDomain(t *testing.T) {
-	store := StubURLStore{
-		urlMap: map[string]string{
-			googleShortSuffix: "google.com",
-		},
-		urlPair: []model.URLPair{
-			{ShortSuffix: googleShortSuffix, BaseURL: "google.com", Domain: ""},
-		},
-	}
-
-	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
-
-	t.Run("returns correct domain when setting valid domain", func(t *testing.T) {
-		domain := "https://shortener.com/"
-		shortenerServer.SetDomain(domain)
-
-		expectedUrlPair := model.URLPair{
-			ShortSuffix: googleShortSuffix,
-			BaseURL:     store.urlMap[googleShortSuffix],
-			Domain:      domain,
-		}
-		request := testutil.NewGetAPIExpandedURLRequest(googleShortSuffix)
-		response := httptest.NewRecorder()
-
-		shortenerServer.ServeHTTP(response, request)
-		urlPair := testutil.GetURLPairFromResponse(t, response.Body)
-
-		testutil.AssertEqual(t, domain, shortenerServer.GetDomain())
-		assertURLPairs(t, urlPair, expectedUrlPair)
-	})
-
-	t.Run("returns the default domain when no domain is manually set", func(t *testing.T) {
-		expectedUrlPair := model.URLPair{
-			ShortSuffix: googleShortSuffix,
-			BaseURL:     store.urlMap[googleShortSuffix],
-			Domain:      shortenerServer.GetDomain(),
-		}
-
-		request := testutil.NewGetAPIExpandedURLRequest(googleShortSuffix)
-		response := httptest.NewRecorder()
-
-		shortenerServer.ServeHTTP(response, request)
-
-		urlPair := testutil.GetURLPairFromResponse(t, response.Body)
-
-		assertURLPairs(t, urlPair, expectedUrlPair)
-	})
-
-}
-func TestAPIGETExpandShortURL(t *testing.T) {
+// API Tests
+func TestAPI_GET_ReturnBaseURL(t *testing.T) {
 	store := StubURLStore{
 		urlMap: map[string]string{
 			googleShortSuffix: "google.com",
@@ -161,7 +114,7 @@ func TestAPIGETExpandShortURL(t *testing.T) {
 	})
 }
 
-func TestAPICreateShortURL(t *testing.T) {
+func TestAPI_POST_CreateShortURL(t *testing.T) {
 	store := StubURLStore{
 		map[string]string{},
 		nil,
@@ -180,6 +133,7 @@ func TestAPICreateShortURL(t *testing.T) {
 	})
 
 	t.Run("records google.com on POST request", func(t *testing.T) {
+		// TODO(HIGH): POST REQUESTS SHOULD include the domain in the response as well
 		baseUrl := "google.com"
 		response := httptest.NewRecorder()
 		request := testutil.NewPostAPIShortenURLRequest(baseUrl)
@@ -188,7 +142,7 @@ func TestAPICreateShortURL(t *testing.T) {
 
 		urlPair := testutil.GetURLPairFromResponse(t, response.Body)
 		testutil.AssertContentType(t, response, server.JsonContentType)
-		assertURLPairs(t, urlPair, model.URLPair{ShortSuffix: expectedShortSuffix, BaseURL: baseUrl})
+		assertURLPairs(t, urlPair, model.URLPair{ShortSuffix: expectedShortSuffix, BaseURL: baseUrl, Domain: shortenerServer.GetDomain()})
 
 		if len(store.shortURLCalls) != 1 {
 			t.Fatalf("got %d calls to shortURLCalls want %d", len(store.shortURLCalls), 1)
@@ -209,169 +163,7 @@ func TestAPICreateShortURL(t *testing.T) {
 	})
 }
 
-func TestAPIConcurrentGETExpandShortURL(t *testing.T) {
-	store := StubURLStore{
-		urlMap: map[string]string{
-			googleShortSuffix: "google.com",
-			githubShortSuffix: "github.com",
-		},
-	}
-
-	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
-	requestCount := 1000
-
-	var wg sync.WaitGroup
-	wg.Add(requestCount)
-
-	for i := 0; i < requestCount; i++ {
-		go func() {
-			defer wg.Done()
-			response := httptest.NewRecorder()
-			request := testutil.NewGetAPIExpandedURLRequest(googleShortSuffix)
-			shortenerServer.ServeHTTP(response, request)
-			gotPair := testutil.GetURLPairFromResponse(t, response.Body)
-			testutil.AssertStatus(t, response.Code, http.StatusOK)
-			testutil.AssertContentType(t, response, server.JsonContentType)
-			assertURLPairs(t, gotPair, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: "google.com", Domain: shortenerServer.GetDomain()})
-		}()
-	}
-	wg.Wait()
-
-	if len(store.getURLCalls) != requestCount {
-		t.Errorf("expected %d calls to get base url but got %d calls", requestCount, len(store.shortURLCalls))
-	}
-}
-
-func TestConcurrentCreateShortURL(t *testing.T) {
-	store := StubURLStore{
-		urlMap: map[string]string{
-			googleShortSuffix: "google.com",
-			githubShortSuffix: "github.com",
-		},
-	}
-
-	createCount := 1000
-	var wg sync.WaitGroup
-	wg.Add(createCount)
-	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
-		ShortenBaseURLFunc: func(baseURL string) (string, error) {
-			switch baseURL {
-			case "google.com":
-				return googleShortSuffix, nil
-			case "github.com":
-				return githubShortSuffix, nil
-			default:
-				return "", nil
-			}
-		},
-	})
-
-	for i := 0; i < createCount; i++ {
-		go func() {
-			defer wg.Done()
-			response := httptest.NewRecorder()
-			request := testutil.NewPostAPIShortenURLRequest(store.urlMap[googleShortSuffix])
-			shortenerServer.ServeHTTP(response, request)
-
-			testutil.AssertStatus(t, response.Code, http.StatusOK)
-			gotPair := testutil.GetURLPairFromResponse(t, response.Body)
-			testutil.AssertContentType(t, response, server.JsonContentType)
-			assertURLPairs(t, gotPair, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: store.urlMap[googleShortSuffix]})
-		}()
-	}
-	wg.Wait()
-	if len(store.shortURLCalls) != createCount {
-		t.Errorf("expected %d calls to create short url but got %d", createCount, len(store.shortURLCalls))
-	}
-}
-
-func TestConcurrentCreateAndGetShortURL(t *testing.T) {
-	store := StubURLStore{
-		urlMap: map[string]string{
-			googleShortSuffix: "google.com",
-			githubShortSuffix: "github.com",
-		},
-	}
-
-	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
-		ShortenBaseURLFunc: func(baseURL string) (string, error) {
-			switch baseURL {
-			case "google.com":
-				return googleShortSuffix, nil
-			case "github.com":
-				return githubShortSuffix, nil
-			default:
-				return "", nil
-			}
-		},
-	})
-
-	requestCount := 1000
-	createCount := 2000
-
-	var wg sync.WaitGroup
-	wg.Add(requestCount + createCount)
-
-	for i := 0; i < requestCount; i++ {
-		go func() {
-			defer wg.Done()
-			response := httptest.NewRecorder()
-			request := testutil.NewGetAPIExpandedURLRequest(googleShortSuffix)
-			shortenerServer.ServeHTTP(response, request)
-			urlPair := testutil.GetURLPairFromResponse(t, response.Body)
-			testutil.AssertContentType(t, response, server.JsonContentType)
-			assertURLPairs(t, urlPair, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: store.urlMap[googleShortSuffix], Domain: shortenerServer.GetDomain()})
-
-			testutil.AssertStatus(t, response.Code, http.StatusOK)
-		}()
-	}
-
-	for j := 0; j < createCount; j++ {
-		go func() {
-			defer wg.Done()
-			response := httptest.NewRecorder()
-			request := testutil.NewPostAPIShortenURLRequest(store.urlMap[githubShortSuffix])
-			shortenerServer.ServeHTTP(response, request)
-			urlPair := testutil.GetURLPairFromResponse(t, response.Body)
-			testutil.AssertContentType(t, response, server.JsonContentType)
-			assertURLPairs(t, urlPair, model.URLPair{ShortSuffix: githubShortSuffix, BaseURL: store.urlMap[githubShortSuffix]})
-
-			testutil.AssertStatus(t, response.Code, http.StatusOK)
-		}()
-	}
-	wg.Wait()
-
-	if len(store.shortURLCalls) != createCount {
-		t.Errorf("expected %d calls to create short url but got %d", createCount, len(store.shortURLCalls))
-	}
-
-	if len(store.getURLCalls) != requestCount {
-		t.Errorf("expected %d calls to get base url but got %d calls", requestCount, len(store.shortURLCalls))
-	}
-}
-
-func TestInvalidRequestsRoute(t *testing.T) {
-	shortenerServer := server.NewURLShortenerServer(&StubURLStore{}, MockURLShortener{})
-	t.Run("GET request to invalid path returns status 404", func(t *testing.T) {
-		response := httptest.NewRecorder()
-		request, _ := http.NewRequest(http.MethodGet, "/badGet/", nil)
-
-		shortenerServer.ServeHTTP(response, request)
-
-		testutil.AssertStatus(t, response.Code, http.StatusNotFound)
-	})
-
-	t.Run("POST request to invalid path returns 404", func(t *testing.T) {
-		response := httptest.NewRecorder()
-		request, _ := http.NewRequest(http.MethodPost, "/badPost/", nil)
-
-		shortenerServer.ServeHTTP(response, request)
-
-		testutil.AssertStatus(t, response.Code, http.StatusNotFound)
-	})
-}
-
-func TestJSONFunctionality(t *testing.T) {
+func TestAPI_JSONResponse(t *testing.T) {
 	store := StubURLStore{
 		urlMap: map[string]string{
 			googleShortSuffix: "google.com",
@@ -437,23 +229,13 @@ func TestJSONFunctionality(t *testing.T) {
 		got := testutil.GetURLPairFromResponse(t, response.Body)
 
 		testutil.AssertContentType(t, response, server.JsonContentType)
-		assertURLPairs(t, got, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: store.urlMap[googleShortSuffix]})
+		assertURLPairs(t, got, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: store.urlMap[googleShortSuffix], Domain: shortenerServer.GetDomain()})
 	})
 
 }
 
-func TestIndexPageOKStatus(t *testing.T) {
-	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "/", nil)
-
-	shortenerServer := server.NewURLShortenerServer(&StubURLStore{}, MockURLShortener{})
-
-	shortenerServer.ServeHTTP(response, request)
-
-	testutil.AssertStatus(t, response.Code, http.StatusOK)
-}
-
-func TestHTMXFunctionality(t *testing.T) {
+// HTMX
+func TestHTMX_Functionality(t *testing.T) {
 	store := StubURLStore{
 		urlMap: map[string]string{
 			googleShortSuffix: "google.com",
@@ -497,6 +279,228 @@ func TestHTMXFunctionality(t *testing.T) {
 		testutil.AssertContentType(t, response, server.HtmxResponseContentType)
 
 	})
+}
+
+// Core Functionality
+func TestServer_SetAndRetrieveCorrectDomain(t *testing.T) {
+	store := StubURLStore{
+		urlMap: map[string]string{
+			googleShortSuffix: "google.com",
+		},
+		urlPair: []model.URLPair{
+			{ShortSuffix: googleShortSuffix, BaseURL: "google.com", Domain: ""},
+		},
+	}
+
+	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
+
+	t.Run("returns correct domain when setting valid domain", func(t *testing.T) {
+		domain := "https://shortener.com/"
+		shortenerServer.SetDomain(domain)
+
+		expectedUrlPair := model.URLPair{
+			ShortSuffix: googleShortSuffix,
+			BaseURL:     store.urlMap[googleShortSuffix],
+			Domain:      domain,
+		}
+		request := testutil.NewGetAPIExpandedURLRequest(googleShortSuffix)
+		response := httptest.NewRecorder()
+
+		shortenerServer.ServeHTTP(response, request)
+		urlPair := testutil.GetURLPairFromResponse(t, response.Body)
+
+		testutil.AssertEqual(t, domain, shortenerServer.GetDomain())
+		assertURLPairs(t, urlPair, expectedUrlPair)
+	})
+
+	t.Run("returns the default domain when no domain is manually set", func(t *testing.T) {
+		expectedUrlPair := model.URLPair{
+			ShortSuffix: googleShortSuffix,
+			BaseURL:     store.urlMap[googleShortSuffix],
+			Domain:      shortenerServer.GetDomain(),
+		}
+
+		request := testutil.NewGetAPIExpandedURLRequest(googleShortSuffix)
+		response := httptest.NewRecorder()
+
+		shortenerServer.ServeHTTP(response, request)
+
+		urlPair := testutil.GetURLPairFromResponse(t, response.Body)
+
+		assertURLPairs(t, urlPair, expectedUrlPair)
+	})
+
+}
+func TestServer_IndexPage(t *testing.T) {
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	shortenerServer := server.NewURLShortenerServer(&StubURLStore{}, MockURLShortener{})
+
+	shortenerServer.ServeHTTP(response, request)
+
+	testutil.AssertStatus(t, response.Code, http.StatusOK)
+}
+func TestServer_InvalidRoutes(t *testing.T) {
+	shortenerServer := server.NewURLShortenerServer(&StubURLStore{}, MockURLShortener{})
+	t.Run("GET request to invalid path returns status 404", func(t *testing.T) {
+		response := httptest.NewRecorder()
+		request, _ := http.NewRequest(http.MethodGet, "/badGet/", nil)
+
+		shortenerServer.ServeHTTP(response, request)
+
+		testutil.AssertStatus(t, response.Code, http.StatusNotFound)
+	})
+
+	t.Run("POST request to invalid path returns 404", func(t *testing.T) {
+		response := httptest.NewRecorder()
+		request, _ := http.NewRequest(http.MethodPost, "/badPost/", nil)
+
+		shortenerServer.ServeHTTP(response, request)
+
+		testutil.AssertStatus(t, response.Code, http.StatusNotFound)
+	})
+}
+
+// Concurrency
+func TestConcurrent_POST_ShortenURL(t *testing.T) {
+	store := StubURLStore{
+		urlMap: map[string]string{
+			googleShortSuffix: "google.com",
+			githubShortSuffix: "github.com",
+		},
+	}
+
+	createCount := 1000
+	var wg sync.WaitGroup
+	wg.Add(createCount)
+	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
+		ShortenBaseURLFunc: func(baseURL string) (string, error) {
+			switch baseURL {
+			case "google.com":
+				return googleShortSuffix, nil
+			case "github.com":
+				return githubShortSuffix, nil
+			default:
+				return "", nil
+			}
+		},
+	})
+
+	for i := 0; i < createCount; i++ {
+		go func() {
+			defer wg.Done()
+			response := httptest.NewRecorder()
+			request := testutil.NewPostAPIShortenURLRequest(store.urlMap[googleShortSuffix])
+			shortenerServer.ServeHTTP(response, request)
+
+			testutil.AssertStatus(t, response.Code, http.StatusOK)
+			gotPair := testutil.GetURLPairFromResponse(t, response.Body)
+			testutil.AssertContentType(t, response, server.JsonContentType)
+			assertURLPairs(t, gotPair, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: store.urlMap[googleShortSuffix], Domain: shortenerServer.GetDomain()})
+		}()
+	}
+	wg.Wait()
+	if len(store.shortURLCalls) != createCount {
+		t.Errorf("expected %d calls to create short url but got %d", createCount, len(store.shortURLCalls))
+	}
+}
+
+func TestConcurrent_CreateAndGetShortURL(t *testing.T) {
+	store := StubURLStore{
+		urlMap: map[string]string{
+			googleShortSuffix: "google.com",
+			githubShortSuffix: "github.com",
+		},
+	}
+
+	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
+		ShortenBaseURLFunc: func(baseURL string) (string, error) {
+			switch baseURL {
+			case "google.com":
+				return googleShortSuffix, nil
+			case "github.com":
+				return githubShortSuffix, nil
+			default:
+				return "", nil
+			}
+		},
+	})
+
+	requestCount := 1000
+	createCount := 2000
+
+	var wg sync.WaitGroup
+	wg.Add(requestCount + createCount)
+
+	for i := 0; i < requestCount; i++ {
+		go func() {
+			defer wg.Done()
+			response := httptest.NewRecorder()
+			request := testutil.NewGetAPIExpandedURLRequest(googleShortSuffix)
+			shortenerServer.ServeHTTP(response, request)
+			urlPair := testutil.GetURLPairFromResponse(t, response.Body)
+			testutil.AssertContentType(t, response, server.JsonContentType)
+			assertURLPairs(t, urlPair, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: store.urlMap[googleShortSuffix], Domain: shortenerServer.GetDomain()})
+
+			testutil.AssertStatus(t, response.Code, http.StatusOK)
+		}()
+	}
+
+	for j := 0; j < createCount; j++ {
+		go func() {
+			defer wg.Done()
+			response := httptest.NewRecorder()
+			request := testutil.NewPostAPIShortenURLRequest(store.urlMap[githubShortSuffix])
+			shortenerServer.ServeHTTP(response, request)
+			urlPair := testutil.GetURLPairFromResponse(t, response.Body)
+			testutil.AssertContentType(t, response, server.JsonContentType)
+			assertURLPairs(t, urlPair, model.URLPair{ShortSuffix: githubShortSuffix, BaseURL: store.urlMap[githubShortSuffix], Domain: shortenerServer.GetDomain()})
+
+			testutil.AssertStatus(t, response.Code, http.StatusOK)
+		}()
+	}
+	wg.Wait()
+
+	if len(store.shortURLCalls) != createCount {
+		t.Errorf("expected %d calls to create short url but got %d", createCount, len(store.shortURLCalls))
+	}
+
+	if len(store.getURLCalls) != requestCount {
+		t.Errorf("expected %d calls to get base url but got %d calls", requestCount, len(store.shortURLCalls))
+	}
+}
+func TestConcurrent_GET_ExpandShortURL(t *testing.T) {
+	store := StubURLStore{
+		urlMap: map[string]string{
+			googleShortSuffix: "google.com",
+			githubShortSuffix: "github.com",
+		},
+	}
+
+	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{})
+	requestCount := 1000
+
+	var wg sync.WaitGroup
+	wg.Add(requestCount)
+
+	for i := 0; i < requestCount; i++ {
+		go func() {
+			defer wg.Done()
+			response := httptest.NewRecorder()
+			request := testutil.NewGetAPIExpandedURLRequest(googleShortSuffix)
+			shortenerServer.ServeHTTP(response, request)
+			gotPair := testutil.GetURLPairFromResponse(t, response.Body)
+			testutil.AssertStatus(t, response.Code, http.StatusOK)
+			testutil.AssertContentType(t, response, server.JsonContentType)
+			assertURLPairs(t, gotPair, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: "google.com", Domain: shortenerServer.GetDomain()})
+		}()
+	}
+	wg.Wait()
+
+	if len(store.getURLCalls) != requestCount {
+		t.Errorf("expected %d calls to get base url but got %d calls", requestCount, len(store.shortURLCalls))
+	}
 }
 
 func assertURLPairs(t testing.TB, got, want model.URLPair) {

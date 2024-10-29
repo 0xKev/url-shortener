@@ -155,6 +155,7 @@ func (u *URLShortenerServer) getURLPair(shortURL, baseURL string) model.URLPair 
 }
 
 func (u *URLShortenerServer) processAPIShortURL(w http.ResponseWriter, r *http.Request) {
+	// shortens base url to Short URL
 	defer r.Body.Close()
 
 	var urlPair *model.URLPair
@@ -169,14 +170,6 @@ func (u *URLShortenerServer) processAPIShortURL(w http.ResponseWriter, r *http.R
 			return
 		}
 	}
-
-	// if r.Header.Get("HX-Request") == "true" {
-	// 	urlPair, err = u.processHTMXShortURL(w, r)
-	// 	if err != nil {
-	// 		http.Error(w, err.Error(), http.StatusInternalServerError)
-	// 		return
-	// 	}
-	// }
 
 	w.WriteHeader(http.StatusOK)
 	u.store.Save(*urlPair)
@@ -203,6 +196,7 @@ func (u *URLShortenerServer) processHTMXShortURL(w http.ResponseWriter, r *http.
 
 func (u *URLShortenerServer) processJSONShortURL(w http.ResponseWriter, r *http.Request) (*model.URLPair, error) {
 	var urlPair = model.URLPair{}
+	// Decoding into urlPair overwrites the default data
 	err := json.NewDecoder(r.Body).Decode(&urlPair)
 
 	if err != nil {
@@ -221,9 +215,12 @@ func (u *URLShortenerServer) processJSONShortURL(w http.ResponseWriter, r *http.
 		return nil, errors.New("could not shorten baseURL: " + err.Error())
 	}
 
+	urlPair.Domain = u.GetDomain()
+
 	w.WriteHeader(http.StatusOK)
 
 	urlPair.ShortSuffix = shortSuffix
+
 	err = json.NewEncoder(w).Encode(urlPair)
 	if err != nil {
 		return nil, errors.New("could not encode to JSON: " + err.Error())
