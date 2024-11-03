@@ -56,6 +56,7 @@ func setupClient() (*redis.Client, context.Context, context.CancelFunc) {
 	return client, ctx, cancel
 }
 
+// TODO(LOW): Figure out if setupConfigurableClient() is necessary
 func setupConfigurableClient(config *redis.Options) (*redis.Client, context.Context, context.CancelFunc) {
 	client := redis.NewClient(config)
 

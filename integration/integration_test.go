@@ -102,7 +102,6 @@ func TestHTMXRecordingBaseURLsAndRetrievingThem(t *testing.T) {
 	}
 
 	// Fetch base URLs from short URLS
-
 	for _, shortSuffix := range shortSuffixes {
 		response := httptest.NewRecorder()
 		shortenerServer.ServeHTTP(response, testutil.NewGetHTMXExpandedURLRequest(shortSuffix))

@@ -26,6 +26,7 @@ const (
 )
 
 func main() {
+	// TODO(MED): Refactor all my tests and codes
 	storeConfig := redisStore.NewRedisConfig(redisAddr, redisPass, redisDB)
 	store, err := redisStore.NewRedisURLStore(storeConfig)
 	if err != nil {
@@ -33,14 +34,13 @@ func main() {
 	}
 	testShortSuffix := "testurl"
 	testBaseURL := "https://www.example.com"
-	err = store.Save(model.URLPair{testShortSuffix, testBaseURL})
+	err = store.Save(model.URLPair{ShortSuffix: testShortSuffix, BaseURL: testBaseURL, Domain: "shortener.com/"})
 	if err != nil {
 		log.Printf("Error saving test URL: %v", err)
 	} else {
 		log.Printf("Test URL saved: %s -> %s", testShortSuffix, testBaseURL)
 	}
 	shortenerConfig := shortener.NewDefaultConfig()
-	shortenerConfig.SetDomain("localhost:5000")
 	shortenerServer := server.NewURLShortenerServer(store, shortener.NewURLShortener(shortenerConfig, encoder))
 	log.Fatal(http.ListenAndServe(":5000", shortenerServer))
 }

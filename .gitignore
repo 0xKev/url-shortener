@@ -181,6 +181,7 @@ notes_demo.txt
 notes_summary.txt
 media/
 .VSCodeCounter
+roadmap.md
 
 # Ignore all migrations
 */migrations/*.py

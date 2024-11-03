@@ -1,5 +1,6 @@
 package redis_store
 
+// TODO: Look into implementing persistent Redis storage as an optional feature
 import (
 	"context"
 	"fmt"
