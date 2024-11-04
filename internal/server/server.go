@@ -165,7 +165,7 @@ func (u *URLShortenerServer) showHTMXExpandedURL(w http.ResponseWriter, r *http.
 	shortSuffix := strings.TrimPrefix(r.URL.Path, "/")
 	baseURL, found := u.store.Load(shortSuffix)
 	if !found {
-		http.Error(w, "baseURL not found", http.StatusNotFound)
+		http.Error(w, "Page not found.", http.StatusNotFound)
 		return
 	}
 	if u.isHTMXRequest(r) {
