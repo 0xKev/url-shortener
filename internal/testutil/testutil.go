@@ -40,7 +40,7 @@ func NewPostAPIShortenURLRequest(baseURL string) *http.Request {
 }
 
 func NewGetHTMXExpandedURLRequest(shortSuffix string) *http.Request {
-	request, err := http.NewRequest(http.MethodGet, server.HtmxExpandRoute+shortSuffix, nil)
+	request, err := http.NewRequest(http.MethodGet, "/"+shortSuffix, nil)
 	if err != nil {
 		return nil
 	}

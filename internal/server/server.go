@@ -24,7 +24,7 @@ const (
 	APIExpandRoute  = "/api/" + APIVersion + ExpandRoute
 	APIShortenRoute = "/api/" + APIVersion + ShortenRoute
 
-	HtmxExpandRoute  = ExpandRoute
+	HtmxExpandRoute  = "/"
 	HtmxShortenRoute = ShortenRoute
 
 	DefaultDomain = "localhost:5000/"
@@ -57,12 +57,19 @@ func NewURLShortenerServer(store URLStore, shortener URLShortener) *URLShortener
 	}
 
 	router := http.NewServeMux()
-	router.HandleFunc("/", server.indexHandler)
+	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/":
+			server.indexHandler(w, r)
+		default:
+			server.expandHandler(w, r)
+		}
+	})
 	router.Handle(APIShortenRoute, http.HandlerFunc(server.shortenHandler))
 	router.Handle(APIExpandRoute, http.HandlerFunc(server.expandHandler))
 
 	router.Handle(HtmxShortenRoute, http.HandlerFunc(server.shortenHandler))
-	router.Handle(HtmxExpandRoute, http.HandlerFunc(server.expandHandler))
+	// router.Handle(HtmxExpandRoute, http.HandlerFunc(server.expandHandler))
 
 	// log.Printf("Routes registered: /, %s, %s", ShortenRoute, ExpandRoute)
 
@@ -155,10 +162,10 @@ func (u *URLShortenerServer) isAPIRequest(r *http.Request) bool {
 }
 
 func (u *URLShortenerServer) showHTMXExpandedURL(w http.ResponseWriter, r *http.Request) {
-	shortSuffix := strings.TrimPrefix(r.URL.Path, HtmxExpandRoute)
+	shortSuffix := strings.TrimPrefix(r.URL.Path, "/")
 	baseURL, found := u.store.Load(shortSuffix)
 	if !found {
-		http.Error(w, "baseURL not found", http.StatusInternalServerError)
+		http.Error(w, "baseURL not found", http.StatusNotFound)
 		return
 	}
 	if u.isHTMXRequest(r) {
