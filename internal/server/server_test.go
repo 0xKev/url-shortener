@@ -14,7 +14,6 @@ import (
 	approvals "github.com/approvals/go-approval-tests"
 )
 
-// TODO(HIGH): Refactor server tests using test data create helpers and tables
 type StubURLStore struct {
 	urlMap        map[string]string
 	shortURLCalls []string
@@ -133,7 +132,6 @@ func TestAPI_POST_CreateShortURL(t *testing.T) {
 	})
 
 	t.Run("records google.com on POST request", func(t *testing.T) {
-		// TODO(HIGH): POST REQUESTS SHOULD include the domain in the response as well
 		baseUrl := "google.com"
 		response := httptest.NewRecorder()
 		request := testutil.NewPostAPIShortenURLRequest(baseUrl)
@@ -328,6 +326,22 @@ func TestServer_SetAndRetrieveCorrectDomain(t *testing.T) {
 		urlPair := testutil.GetURLPairFromResponse(t, response.Body)
 
 		assertURLPairs(t, urlPair, expectedUrlPair)
+	})
+
+	t.Run("returns error when setting invalid domain", func(t *testing.T) {
+		invalidDomains := []string{
+			"invalid-domain",
+			"http://domain",
+			".com",
+			"domain.com", // need trailing slash
+		}
+
+		for _, invalidDomain := range invalidDomains {
+			err := shortenerServer.SetDomain(invalidDomain)
+			if err == nil {
+				t.Errorf("expected error when setting invalid domain '%q'", invalidDomain)
+			}
+		}
 	})
 
 }

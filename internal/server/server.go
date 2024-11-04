@@ -3,8 +3,11 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
+
+	"net/url"
 
 	urlrenderer "github.com/0xKev/url-shortener"
 	"github.com/0xKev/url-shortener/internal/model"
@@ -71,7 +74,35 @@ func NewURLShortenerServer(store URLStore, shortener URLShortener) *URLShortener
 
 func (u *URLShortenerServer) SetDomain(domain string) error {
 	// TODO(MED): Check for valid domain
-	u.domain = domain
+	if u.validateDomain(domain) == nil {
+		u.domain = domain
+		return nil
+	} else {
+		return u.validateDomain(domain)
+	}
+
+}
+
+func (u *URLShortenerServer) validateDomain(domain string) error {
+	domainURL, err := url.Parse(domain)
+	if err != nil {
+		return fmt.Errorf("unable to parse domain '%v'", domain)
+	}
+
+	if domainURL.Scheme == "" {
+		return fmt.Errorf("invalid domain: missing scheme")
+	}
+
+	if domainURL.Host == "" {
+		return fmt.Errorf("invalid domain: missing host")
+	}
+
+	if len(domainURL.Path) == 0 {
+		return fmt.Errorf("invalid domain: missing trailing slash")
+	} else if domainURL.Path[len(domainURL.Path)-1] != '/' {
+		return fmt.Errorf("invalid domain: missing trailing slash")
+	}
+
 	return nil
 }
 
