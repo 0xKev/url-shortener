@@ -69,8 +69,7 @@ func NewURLShortenerServer(store URLStore, shortener URLShortener) *URLShortener
 	router.Handle(APIExpandRoute, http.HandlerFunc(server.expandHandler))
 
 	router.Handle(HtmxShortenRoute, http.HandlerFunc(server.shortenHandler))
-	// router.Handle(HtmxExpandRoute, http.HandlerFunc(server.expandHandler))
-
+	router.Handle("/static/", http.FileServer(http.FS(urlrenderer.GetStaticFS())))
 	// log.Printf("Routes registered: /, %s, %s", ShortenRoute, ExpandRoute)
 
 	server.Handler = router

@@ -8,11 +8,11 @@ import (
 	"github.com/0xKev/url-shortener/internal/model"
 )
 
-var (
-	//go:embed "templates/*.gohtml"
-	//go:embed "static/css/output.css"
-	urlPairTemplates embed.FS
-)
+//go:embed "templates/*.gohtml"
+var urlPairTemplates embed.FS
+
+//go:embed "static/css/output.css"
+var static embed.FS
 
 type URLPairRenderer struct {
 	templ *template.Template
@@ -25,6 +25,10 @@ func NewURLPairRenderer() (*URLPairRenderer, error) {
 	}
 
 	return &URLPairRenderer{templ: templ}, nil
+}
+
+func GetStaticFS() embed.FS {
+	return static
 }
 
 func (u *URLPairRenderer) Render(w io.Writer, urlPair model.URLPair) error {

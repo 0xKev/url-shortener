@@ -6,7 +6,6 @@
     
     <div class="mb-2">
         <h3 class="font-semibold text-lg">Short URL</h3>
-        
         <div class="border rounded-md p-2">https://s.domain.com/0000001</div>
     </div>
 
