@@ -58,10 +58,10 @@ func NewURLShortenerServer(store URLStore, shortener URLShortener) *URLShortener
 
 	router := http.NewServeMux()
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/":
+		// BUG: Default is redirecting all traffic to expandHandler if not index page
+		if r.URL.Path == "/" {
 			server.indexHandler(w, r)
-		default:
+		} else if !strings.Contains(r.URL.Path, "api") && !strings.Contains(r.URL.Path, ShortenRoute) && !strings.Contains(r.URL.Path, "static") {
 			server.expandHandler(w, r)
 		}
 	})
@@ -75,7 +75,6 @@ func NewURLShortenerServer(store URLStore, shortener URLShortener) *URLShortener
 	server.Handler = router
 
 	return server
-
 }
 
 func (u *URLShortenerServer) SetDomain(domain string) error {
@@ -86,7 +85,6 @@ func (u *URLShortenerServer) SetDomain(domain string) error {
 	} else {
 		return u.validateDomain(domain)
 	}
-
 }
 
 func (u *URLShortenerServer) validateDomain(domain string) error {
@@ -214,12 +212,13 @@ func (u *URLShortenerServer) processAPIShortURL(w http.ResponseWriter, r *http.R
 
 func (u *URLShortenerServer) processHTMXShortURL(w http.ResponseWriter, r *http.Request) (*model.URLPair, error) {
 	baseURL := r.FormValue("base-url")
-	if baseURL == "" {
-		return nil, errors.New("could not process baseURL from HTMX request")
-	}
-	shortSuffix, err := u.shortener.ShortenURL(baseURL)
+	shortSuffix, err := u.shortener.ShortenURL(baseURL) // ShortenURL has validation
 	if err != nil {
-		return nil, errors.New("could not shorten baseURL: " + err.Error())
+		renderErr := u.renderer.RenderInvalidUserInput(w, model.URLPair{BaseURL: baseURL, Error: err.Error()})
+		if renderErr != nil {
+			panic(err) // TODO(MED): Error handling
+		}
+		return nil, err
 	}
 
 	urlPair := u.getURLPair(shortSuffix, baseURL)

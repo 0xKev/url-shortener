@@ -240,6 +240,7 @@ func TestHTMX_Functionality(t *testing.T) {
 			githubShortSuffix: "github.com",
 		},
 	}
+	// BUG: Mock for errors need to be the actual error types
 	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
 		ShortenBaseURLFunc: func(baseURL string) (string, error) {
 			switch baseURL {
@@ -248,7 +249,7 @@ func TestHTMX_Functionality(t *testing.T) {
 			case "github.com":
 				return githubShortSuffix, nil
 			default:
-				return "", nil
+				return "", fmt.Errorf("invalid url: %s", baseURL)
 			}
 		},
 	})
@@ -264,7 +265,7 @@ func TestHTMX_Functionality(t *testing.T) {
 		testutil.AssertHTMXRedirect(t, *response.Result(), store.urlMap[googleShortSuffix])
 	})
 
-	t.Run("POST /shorten with HTMX returns HTML partial", func(t *testing.T) {
+	t.Run("POST /shorten with valid HTMX baseURL returns HTML partial", func(t *testing.T) {
 		request := testutil.NewPostHTMXShortenURLRequest(store.urlMap[googleShortSuffix])
 
 		response := httptest.NewRecorder()
@@ -275,7 +276,18 @@ func TestHTMX_Functionality(t *testing.T) {
 
 		approvals.VerifyString(t, response.Body.String())
 		testutil.AssertContentType(t, response, server.HtmxResponseContentType)
+	})
 
+	t.Run("POST /shorten with invalid HTMX baseURL returns HTML partial with error message", func(t *testing.T) {
+		// TODO(HIGH): Render the error html partial
+		request := testutil.NewPostHTMXShortenURLRequest("bad-base-url")
+		response := httptest.NewRecorder()
+
+		shortenerServer.ServeHTTP(response, request)
+
+		testutil.AssertStatus(t, response.Code, http.StatusOK)
+		approvals.VerifyString(t, response.Body.String())
+		testutil.AssertContentType(t, response, server.HtmxResponseContentType)
 	})
 }
 
