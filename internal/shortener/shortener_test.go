@@ -75,6 +75,7 @@ func TestShortenURL(t *testing.T) {
 		}{
 			{"", shortener.InvalidURLError{shortener.ErrEmptyURL, ""}},
 			{"google", shortener.InvalidURLError{shortener.ErrNoDomainURL, "google"}},
+			{"bad-base-url", shortener.InvalidURLError{shortener.ErrNoDomainURL, "bad-base-url"}},
 		}
 
 		for _, c := range cases {

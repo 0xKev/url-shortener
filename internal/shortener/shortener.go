@@ -36,15 +36,6 @@ func (s ShortURLNotFoundError) Error() string {
 	return fmt.Sprintf("%v does not exist in store", s.ShortURL)
 }
 
-type InvalidURLError struct {
-	ErrorMsg     string
-	SubmittedURL string
-}
-
-func (i InvalidURLError) Error() string {
-	return fmt.Sprintf("invalid url %s, %v", i.ErrorMsg, i.SubmittedURL)
-}
-
 type Config struct {
 	urlSuffixLength uint64
 	urlCounterLimit uint64
@@ -126,7 +117,6 @@ func (u *URLShortener) validateURL(link string) error {
 	if !strings.Contains(link, ".") {
 		return InvalidURLError{ErrNoDomainURL, link}
 	}
-
 	return nil
 }
 
