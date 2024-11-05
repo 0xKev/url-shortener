@@ -44,6 +44,17 @@ func TestRender(t *testing.T) {
 
 		approvals.VerifyString(t, buf.String())
 	})
+
+	t.Run("renders invalid_user_input.gohtml with error message when user submits invalid url", func(t *testing.T) {
+		// TODO(HIGH): Add correct error page rendering
+		buf := bytes.Buffer{}
+		urlPair := model.URLPair{BaseURL: "bad-base-url", Error: "input link is not valid."}
+
+		if err := urlPairRenderer.RenderInvalidUserInput(&buf, urlPair); err != nil {
+			t.Fatal(err)
+		}
+		approvals.VerifyString(t, buf.String())
+	})
 }
 
 func BenchmarkRender(b *testing.B) {

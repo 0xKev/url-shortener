@@ -44,3 +44,11 @@ func (u *URLPairRenderer) RenderIndex(w io.Writer) error {
 	}
 	return nil
 }
+
+func (u *URLPairRenderer) RenderInvalidUserInput(w io.Writer, urlPair model.URLPair) error {
+	// TODO(HIGH): add templ render for invalid user input (add an error message field to the urlPair)
+	if err := u.templ.ExecuteTemplate(w, "invalid_user_input.gohtml", urlPair); err != nil {
+		return err
+	}
+	return nil
+}
