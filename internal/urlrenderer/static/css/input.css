@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* https://www.realtimecolors.com/?colors=000000-ffffff-4a90e2-e8f0f9-173e6d&fonts=Inter-Inter */
+@layer base {
+  :root {
+    --text: #000000;
+    --background: #ffffff;
+    --primary: #4a90e2;
+    --secondary: #e8f0f9;
+    --accent: #173e6d;
+  }
+  .dark {
+    --text: #ffffff;
+    --background: #000000;
+    --primary: #1d64b4;
+    --secondary: #060f18;
+    --accent: #92b8e8;
+  }
+}

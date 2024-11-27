@@ -22,7 +22,7 @@ type StubURLStore struct {
 	mu            sync.Mutex
 }
 
-func (s *StubURLStore) Save(urlPair model.URLPair) error {
+func (s *StubURLStore) Save(urlPair *model.URLPair) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.shortURLCalls = append(s.shortURLCalls, urlPair.ShortSuffix)
@@ -240,7 +240,6 @@ func TestHTMX_Functionality(t *testing.T) {
 			githubShortSuffix: "github.com",
 		},
 	}
-	// BUG: Mock for errors need to be the actual error types
 	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
 		ShortenBaseURLFunc: func(baseURL string) (string, error) {
 			switch baseURL {
@@ -279,7 +278,6 @@ func TestHTMX_Functionality(t *testing.T) {
 	})
 
 	t.Run("POST /shorten with invalid HTMX baseURL returns HTML partial with error message", func(t *testing.T) {
-		// TODO(HIGH): Render the error html partial
 		request := testutil.NewPostHTMXShortenURLRequest("bad-base-url")
 		response := httptest.NewRecorder()
 

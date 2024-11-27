@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/0xKev/url-shortener/internal/urlrenderer"
 	"net/http"
 	"strings"
 
 	"net/url"
 
-	urlrenderer "github.com/0xKev/url-shortener"
 	"github.com/0xKev/url-shortener/internal/model"
 )
 
@@ -43,22 +43,14 @@ type URLShortenerServer struct {
 }
 
 func NewURLShortenerServer(store URLStore, shortener URLShortener) *URLShortenerServer {
-	renderer, err := urlrenderer.NewURLPairRenderer()
-
-	if err != nil {
-		panic(err) // panic only temp - handle err later
-	}
-
 	server := &URLShortenerServer{
 		store:     store,
 		shortener: shortener,
-		renderer:  renderer,
 		domain:    DefaultDomain,
 	}
 
 	router := http.NewServeMux()
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// BUG: Default is redirecting all traffic to expandHandler if not index page
 		if r.URL.Path == "/" {
 			server.indexHandler(w, r)
 		} else if !strings.Contains(r.URL.Path, "api") && !strings.Contains(r.URL.Path, ShortenRoute) && !strings.Contains(r.URL.Path, "static") {
@@ -78,7 +70,6 @@ func NewURLShortenerServer(store URLStore, shortener URLShortener) *URLShortener
 }
 
 func (u *URLShortenerServer) SetDomain(domain string) error {
-	// TODO(MED): Check for valid domain
 	if u.validateDomain(domain) == nil {
 		u.domain = domain
 		return nil
@@ -207,7 +198,7 @@ func (u *URLShortenerServer) processAPIShortURL(w http.ResponseWriter, r *http.R
 	}
 
 	w.WriteHeader(http.StatusOK)
-	u.store.Save(*urlPair)
+	u.store.Save(urlPair)
 }
 
 func (u *URLShortenerServer) processHTMXShortURL(w http.ResponseWriter, r *http.Request) (*model.URLPair, error) {
@@ -216,16 +207,18 @@ func (u *URLShortenerServer) processHTMXShortURL(w http.ResponseWriter, r *http.
 	if err != nil {
 		renderErr := u.renderer.RenderInvalidUserInput(w, model.URLPair{BaseURL: baseURL, Error: err.Error()})
 		if renderErr != nil {
-			panic(err) // TODO(MED): Error handling
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return nil, err
 		}
 		return nil, err
 	}
 
 	urlPair := u.getURLPair(shortSuffix, baseURL)
-	u.store.Save(urlPair)
+	u.store.Save(&urlPair)
 	err = u.renderer.Render(w, urlPair)
 	if err != nil {
-		panic(err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return nil, err
 	}
 	return &urlPair, nil
 }
@@ -266,6 +259,6 @@ func (u *URLShortenerServer) processJSONShortURL(w http.ResponseWriter, r *http.
 }
 
 type URLStore interface {
-	Save(model.URLPair) error
+	Save(*model.URLPair) error
 	Load(shortSuffix string) (string, bool)
 }

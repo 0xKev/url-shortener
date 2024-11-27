@@ -1,0 +1,20 @@
+{{template "base" .}}
+{{define "content"}}
+<main class="flex justify-center">
+    <div class="w-full max-w-2xl">
+        <div id="shorten-url" class="m-8 shadow-lg border bg-background p-6 rounded-lg space-y-4">
+            <form hx-get="/shorten" hx-target="#shorten-url" hx-swap="outerHTML" class="space-y-4">
+                <div class="space-y-2">
+                    <h3 class="text-lg font-semibold">Shorten link here :)</h3>
+                    <input type="url" name="base-url" placeholder="Enter link here" value="{{.BaseURL}}" class="border rounded w-full p-2">
+                </div>
+                <button type="submit" class="bg-primary text-background rounded-md px-4 py-2 hover:bg-accent transition">Shorten</button>
+            </form>
+        </div>
+        <div id="result" class="m-8"></div>
+    </div>
+    <p id="error-msg">{{.Error}}</p>
+</main>
+{{end}}
+</body>
+</html>

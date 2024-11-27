@@ -1,0 +1,33 @@
+<!-- mock response url pair -->
+<!-- show baseurl, shorturl, button to copy to kb and shorten another-->
+ <!-- misc : add qr code option -->
+
+<div id="mock-url-pair" class="shadow-lg bg-background rounded-lg mx-auto max-w-2xl space-y-4 p-6 border" x-data="{ isCopied: false }">
+    <div class="mb-2">
+        <h3 class="font-semibold text-lg">Original URL</h3>
+        <div class="border rounded-md p-2">https://google.com</div>
+    </div>
+    
+    <div class="mb-2">
+        <h3 class="font-semibold text-lg">Short URL</h3>
+        <div x-ref="shortUrl" class="border rounded-md p-2">https://shortener.com/0000001</div>
+    </div>
+
+    <div class="flex flex-row justify-between w-full">
+        <div class="flex space-x-2">
+            <!-- TODO(LOW): Implement QR code functionality -->
+            <button class="bg-secondary text-text font-semibold rounded-md px-4 py-2 hover:bg-primary transition">QR Code</button>
+            <!-- TODO(MED): Implement Copy button to copy to clipboard -->
+            <button class="bg-primary text-background rounded-md px-4 py-2 hover:bg-accent transition focus:outline-none focus:ring focus:ring-violet-200" 
+                @click="navigator.clipboard.writeText($refs.shortUrl.innerText); isCopied = true; setTimeout(() => isCopied = false, 3000)" 
+                x-text="isCopied ? 'Copied': 'Copy'"
+                >
+            </button>
+        </div>
+
+        <a href="index_dev.html" class="group relative px-4 py-2 overflow-hidden rounded-lg bg-background font-semibold shadow">
+            <div class="absolute inset-0 w-3 bg-primary transition-all duration-[250ms] ease-out group-hover:w-full"></div>
+            <button class="relative text-text group-hover:text-background">Shorten Another</button>
+        </a>
+    </div>
+</div>
