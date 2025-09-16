@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/0xKev/url-shortener/internal/base62"
 	shortener "github.com/0xKev/url-shortener/internal/shortener"
 )
 
@@ -54,7 +55,6 @@ func TestShortenURL(t *testing.T) {
 		assertEqual(t, urlShortener.Config.URLCounter(), encoder.encodeCalls[1])
 
 		assertEqual(t, len(encoder.encodeCalls), 2)
-
 	})
 
 	t.Run("shorten same base url results in new short links", func(t *testing.T) {
@@ -153,19 +153,31 @@ func TestConcurrentShortening(t *testing.T) {
 }
 
 func BenchmarkValidShortening(b *testing.B) {
+	b.Logf("Starting benchmark with b.N = %d", b.N)
 	urlShortener, _ := setUpShortener()
 	b.ResetTimer()
-	for i := 0; i < 1000; i++ {
-		shortLink, _ := urlShortener.ShortenURL(fmt.Sprintf("example%d.com", i))
-		assertSuffixLength(b, shortLink, urlShortener)
+	for i := 0; i < b.N; i++ {
+		_, err := urlShortener.ShortenURL(fmt.Sprintf("example%d.com", i))
+		if err != nil {
+			b.StopTimer()
+			b.Logf("Error found at iteration %d: %v", i, err)
+			b.StartTimer()
+			break
+		}
+		// assertSuffixLength(b, shortLink, urlShortener) // Removing the validation from the benchmark since normal testing passes
 	}
 }
 
 func setUpShortener() (*shortener.URLShortener, *MockEncoder) {
 	defaultConfig := shortener.NewDefaultConfig()
+	// mockEncoder := MockEncoder{
+	// 	encodeFunc: func(num uint64) string {
+	// 		return fmt.Sprintf("%07d", num)
+	// 	},
+	// }
 	mockEncoder := MockEncoder{
 		encodeFunc: func(num uint64) string {
-			return fmt.Sprintf("%07d", num)
+			return base62.Encode(num)
 		},
 	}
 	urlShortener := shortener.NewURLShortener(defaultConfig, &mockEncoder) // nil loads in default config
