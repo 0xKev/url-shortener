@@ -34,7 +34,7 @@ func main() {
 	}
 	testShortSuffix := "testurl"
 	testBaseURL := "https://www.example.com"
-	err = store.Save(model.URLPair{ShortSuffix: testShortSuffix, BaseURL: testBaseURL, Domain: "shortener.com/"})
+	err = store.Save(&model.URLPair{ShortSuffix: testShortSuffix, BaseURL: testBaseURL, Domain: "shortener.com/"})
 	if err != nil {
 		log.Printf("Error saving test URL: %v", err)
 	} else {

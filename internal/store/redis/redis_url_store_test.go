@@ -10,8 +10,10 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const shortSuffix = "000000"
-const baseURL = "google.com"
+const (
+	shortSuffix = "000000"
+	baseURL     = "google.com"
+)
 
 func pingRedis(t testing.TB, ctx context.Context, client *redis.Client) {
 	t.Helper()
@@ -34,7 +36,6 @@ func retrieveString(t testing.TB, ctx context.Context, client *redis.Client, sho
 	t.Helper()
 
 	val, err := client.Get(ctx, shortSuffix).Result()
-
 	if err != nil {
 		t.Fatalf("unable to retrieve short link from redis, %v", err)
 	}
@@ -87,8 +88,7 @@ func TestRedisURLStoreImplementation(t *testing.T) {
 
 	urlStore := RedisURLStore{client: client}
 
-	err := urlStore.Save(model.URLPair{BaseURL: baseURL, ShortSuffix: shortSuffix})
-
+	err := urlStore.Save(&model.URLPair{BaseURL: baseURL, ShortSuffix: shortSuffix})
 	if err != nil {
 		t.Fatalf("Save method error, %v", err)
 	}
