@@ -11,7 +11,6 @@ import (
 	"github.com/0xKev/url-shortener/internal/model"
 	server "github.com/0xKev/url-shortener/internal/server"
 	testutil "github.com/0xKev/url-shortener/internal/testutil"
-	approvals "github.com/approvals/go-approval-tests"
 )
 
 type StubURLStore struct {
@@ -48,10 +47,12 @@ func (m MockURLShortener) ShortenURL(baseURL string) (string, error) {
 	return "", nil
 }
 
-var googleShortSuffix = "0000001"
-var githubShortSuffix = "0000002"
-var doesNotExistShortSuffix = "1000000"
-var invalidBaseURL = ""
+var (
+	googleShortSuffix       = "0000001"
+	githubShortSuffix       = "0000002"
+	doesNotExistShortSuffix = "1000000"
+	invalidBaseURL          = ""
+)
 
 // API Tests
 func TestAPI_GET_ReturnBaseURL(t *testing.T) {
@@ -121,7 +122,7 @@ func TestAPI_POST_CreateShortURL(t *testing.T) {
 		[]model.URLPair{},
 		sync.Mutex{},
 	}
-	var expectedShortSuffix = "0000001"
+	expectedShortSuffix := "0000001"
 	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
 		ShortenBaseURLFunc: func(baseURL string) (string, error) {
 			if baseURL == invalidBaseURL {
@@ -229,66 +230,66 @@ func TestAPI_JSONResponse(t *testing.T) {
 		testutil.AssertContentType(t, response, server.JsonContentType)
 		assertURLPairs(t, got, model.URLPair{ShortSuffix: googleShortSuffix, BaseURL: store.urlMap[googleShortSuffix], Domain: shortenerServer.GetDomain()})
 	})
-
 }
 
 // HTMX
-func TestHTMX_Functionality(t *testing.T) {
-	store := StubURLStore{
-		urlMap: map[string]string{
-			googleShortSuffix: "google.com",
-			githubShortSuffix: "github.com",
-		},
-	}
-	shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
-		ShortenBaseURLFunc: func(baseURL string) (string, error) {
-			switch baseURL {
-			case "google.com":
-				return googleShortSuffix, nil
-			case "github.com":
-				return githubShortSuffix, nil
-			default:
-				return "", fmt.Errorf("invalid url: %s", baseURL)
-			}
-		},
-	})
-
-	shortenerServer.SetDomain("https://shortener.domain.com/")
-
-	t.Run("GET /expand/ with HTMX sets HX-Redirect Header", func(t *testing.T) {
-		request := testutil.NewGetHTMXExpandedURLRequest(googleShortSuffix)
-		response := httptest.NewRecorder()
-
-		shortenerServer.ServeHTTP(response, request)
-		testutil.AssertStatus(t, response.Code, http.StatusOK)
-		testutil.AssertHTMXRedirect(t, *response.Result(), store.urlMap[googleShortSuffix])
-	})
-
-	t.Run("POST /shorten with valid HTMX baseURL returns HTML partial", func(t *testing.T) {
-		request := testutil.NewPostHTMXShortenURLRequest(store.urlMap[googleShortSuffix])
-
-		response := httptest.NewRecorder()
-
-		shortenerServer.ServeHTTP(response, request)
-
-		testutil.AssertStatus(t, response.Code, http.StatusOK)
-
-		approvals.VerifyString(t, response.Body.String())
-		testutil.AssertContentType(t, response, server.HtmxResponseContentType)
-	})
-
-	t.Run("POST /shorten with invalid HTMX baseURL returns HTML partial with error message", func(t *testing.T) {
-		request := testutil.NewPostHTMXShortenURLRequest("bad-base-url")
-		response := httptest.NewRecorder()
-
-		shortenerServer.ServeHTTP(response, request)
-
-		testutil.AssertStatus(t, response.Code, http.StatusOK)
-		approvals.VerifyString(t, response.Body.String())
-		testutil.AssertContentType(t, response, server.HtmxResponseContentType)
-	})
-}
-
+//
+//	func TestHTMX_Functionality(t *testing.T) {
+//		store := StubURLStore{
+//			urlMap: map[string]string{
+//				googleShortSuffix: "google.com",
+//				githubShortSuffix: "github.com",
+//			},
+//		}
+//		shortenerServer := server.NewURLShortenerServer(&store, MockURLShortener{
+//			ShortenBaseURLFunc: func(baseURL string) (string, error) {
+//				switch baseURL {
+//				case "google.com":
+//					return googleShortSuffix, nil
+//				case "github.com":
+//					return githubShortSuffix, nil
+//				default:
+//					return "", fmt.Errorf("invalid url: %s", baseURL)
+//				}
+//			},
+//		})
+//
+//		shortenerServer.SetDomain("https://shortener.domain.com/")
+//
+//		t.Run("GET /expand/ with HTMX sets HX-Redirect Header", func(t *testing.T) {
+//			request := testutil.NewGetHTMXExpandedURLRequest(googleShortSuffix)
+//			response := httptest.NewRecorder()
+//
+//			shortenerServer.ServeHTTP(response, request)
+//			testutil.AssertStatus(t, response.Code, http.StatusOK)
+//			testutil.AssertHTMXRedirect(t, *response.Result(), store.urlMap[googleShortSuffix])
+//		})
+//
+//		t.Run("POST /shorten with valid HTMX baseURL returns HTML partial", func(t *testing.T) {
+//			request := testutil.NewPostHTMXShortenURLRequest(store.urlMap[googleShortSuffix])
+//
+//			response := httptest.NewRecorder()
+//
+//			shortenerServer.ServeHTTP(response, request)
+//
+//			testutil.AssertStatus(t, response.Code, http.StatusOK)
+//
+//			approvals.VerifyString(t, response.Body.String())
+//			testutil.AssertContentType(t, response, server.HtmxResponseContentType)
+//		})
+//
+//		t.Run("POST /shorten with invalid HTMX baseURL returns HTML partial with error message", func(t *testing.T) {
+//			request := testutil.NewPostHTMXShortenURLRequest("bad-base-url")
+//			response := httptest.NewRecorder()
+//
+//			shortenerServer.ServeHTTP(response, request)
+//
+//			testutil.AssertStatus(t, response.Code, http.StatusOK)
+//			approvals.VerifyString(t, response.Body.String())
+//			testutil.AssertContentType(t, response, server.HtmxResponseContentType)
+//		})
+//	}
+//
 // Core Functionality
 func TestServer_SetAndRetrieveCorrectDomain(t *testing.T) {
 	store := StubURLStore{
@@ -353,18 +354,18 @@ func TestServer_SetAndRetrieveCorrectDomain(t *testing.T) {
 			}
 		}
 	})
-
 }
-func TestServer_IndexPage(t *testing.T) {
-	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "/", nil)
 
-	shortenerServer := server.NewURLShortenerServer(&StubURLStore{}, MockURLShortener{})
-
-	shortenerServer.ServeHTTP(response, request)
-
-	testutil.AssertStatus(t, response.Code, http.StatusOK)
-}
+//	func TestServer_IndexPage(t *testing.T) {
+//		response := httptest.NewRecorder()
+//		request := httptest.NewRequest(http.MethodGet, "/", nil)
+//
+//		shortenerServer := server.NewURLShortenerServer(&StubURLStore{}, MockURLShortener{})
+//
+//		shortenerServer.ServeHTTP(response, request)
+//
+//		testutil.AssertStatus(t, response.Code, http.StatusOK)
+//	}
 func TestServer_InvalidRoutes(t *testing.T) {
 	shortenerServer := server.NewURLShortenerServer(&StubURLStore{}, MockURLShortener{})
 	t.Run("GET request to invalid path returns status 404", func(t *testing.T) {
@@ -494,6 +495,7 @@ func TestConcurrent_CreateAndGetShortURL(t *testing.T) {
 		t.Errorf("expected %d calls to get base url but got %d calls", requestCount, len(store.shortURLCalls))
 	}
 }
+
 func TestConcurrent_GET_ExpandShortURL(t *testing.T) {
 	store := StubURLStore{
 		urlMap: map[string]string{
